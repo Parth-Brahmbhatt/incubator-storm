@@ -83,7 +83,16 @@ if "%1" == "--service" (
     set STORM_OPTS=%STORM_CLIENT_OPTS% %STORM_OPTS% -Dstorm.jar=%2
     set CLASSPATH=%CLASSPATH%;%2
     set CLASS=%3
-    set storm-command-arguments=%4 %5 %6 %7 %8 %9
+    set args=%4
+    shift
+    :start
+    if [%4] == [] goto done
+    set args=%args% %4
+    shift
+    goto start
+
+    :done
+    set storm-command-arguments=%args%
   )
 
   if not defined STORM_LOG_FILE (
