@@ -15,7 +15,8 @@
 ;; limitations under the License.
 (ns backtype.storm.daemon.nimbus
   (:import [java.nio ByteBuffer]
-           [java.util Collections])
+           [java.util Collections]
+           [backtype.storm.generated StormTopology])
   (:import [java.io FileNotFoundException])
   (:import [java.nio.channels Channels WritableByteChannel])
   (:import [backtype.storm.security.auth ThriftServer ThriftConnectionType ReqContext AuthUtils])
@@ -98,8 +99,8 @@
     (merge conf
            (Utils/deserialize
             (FileUtils/readFileToByteArray
-             (File. (master-stormconf-path stormroot))
-             )))))
+             (File. (master-stormconf-path stormroot)))
+             java.util.Map))))
 
 (defn set-topology-status! [nimbus storm-id status]
   (let [storm-cluster-state (:storm-cluster-state nimbus)]
@@ -326,8 +327,8 @@
   (let [stormroot (master-stormdist-root conf storm-id)]
     (Utils/deserialize
       (FileUtils/readFileToByteArray
-        (File. (master-stormcode-path stormroot))
-        ))))
+        (File. (master-stormcode-path stormroot)))
+      StormTopology)))
 
 (declare compute-executor->component)
 

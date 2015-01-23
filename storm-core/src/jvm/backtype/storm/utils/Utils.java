@@ -91,8 +91,8 @@ public class Utils {
         return serializationDelegate.serialize(obj);
     }
 
-    public static Object deserialize(byte[] serialized) {
-        return serializationDelegate.deserialize(serialized);
+    public static <T> T deserialize(byte[] serialized, Class<T> clazz) {
+        return serializationDelegate.deserialize(serialized, clazz);
     }
 
     public static <T> String join(Iterable<T> coll, String sep) {
@@ -231,7 +231,7 @@ public class Utils {
 
     public static Object getSetComponentObject(ComponentObject obj) {
         if(obj.getSetField()==ComponentObject._Fields.SERIALIZED_JAVA) {
-            return Utils.deserialize(obj.get_serialized_java());
+            return Utils.deserialize(obj.get_serialized_java(), obj.getClass());
         } else if(obj.getSetField()==ComponentObject._Fields.JAVA_OBJECT) {
             return obj.get_java_object();
         } else {

@@ -228,9 +228,9 @@
       (cb id))))
 
 (defn- maybe-deserialize
-  [ser]
+  [ser clazz]
   (when ser
-    (Utils/deserialize ser)))
+    (Utils/deserialize ser clazz)))
 
 (defstruct TaskError :error :time-secs :host :port)
 
@@ -292,7 +292,7 @@
         [this storm-id callback]
         (when callback
           (swap! assignment-info-callback assoc storm-id callback))
-        (maybe-deserialize (get-data cluster-state (assignment-path storm-id) (not-nil? callback))))
+        (maybe-deserialize (get-data cluster-state (assignment-path storm-id) (not-nil? callback)) backtype.storm.daemon.common.Assignment))
 
       (assignment-info-with-version 
         [this storm-id callback]
@@ -300,7 +300,7 @@
           (swap! assignment-info-with-version-callback assoc storm-id callback))
         (let [{data :data version :version} 
               (get-data-with-version cluster-state (assignment-path storm-id) (not-nil? callback))]
-        {:data (maybe-deserialize data)
+        {:data (maybe-deserialize data backtype.storm.daemon.common.Assignment)
          :version version}))
 
       (assignment-version 
@@ -325,7 +325,7 @@
         [this storm-id node port]
         (-> cluster-state
             (get-data (workerbeat-path storm-id node port) false)
-            maybe-deserialize))
+            (maybe-deserialize backtype.storm.daemon.common.WorkerHeartbeat)))
 
       (executor-beats
         [this storm-id executor->node+port]
@@ -348,7 +348,7 @@
 
       (supervisor-info
         [this supervisor-id]
-        (maybe-deserialize (get-data cluster-state (supervisor-path supervisor-id) false)))
+        (maybe-deserialize (get-data cluster-state (supervisor-path supervisor-id) false) backtype.storm.daemon.common.SupervisorInfo))
 
       (worker-heartbeat!
         [this storm-id node port info]
@@ -399,7 +399,7 @@
         [this storm-id callback]
         (when callback
           (swap! storm-base-callback assoc storm-id callback))
-        (maybe-deserialize (get-data cluster-state (storm-path storm-id) (not-nil? callback))))
+        (maybe-deserialize (get-data cluster-state (storm-path storm-id) (not-nil? callback)) backtype.storm.daemon.common.StormBase))
 
       (remove-storm-base!
         [this storm-id]
@@ -425,7 +425,7 @@
         [this storm-id callback]
         (when callback
           (swap! credentials-callback assoc storm-id callback))
-        (maybe-deserialize (get-data cluster-state (credentials-path storm-id) (not-nil? callback))))
+        (maybe-deserialize (get-data cluster-state (credentials-path storm-id) (not-nil? callback)) java.util.Map))
 
       (report-error
          [this storm-id component-id node port error]
@@ -446,7 +446,7 @@
                errors (if (exists-node? cluster-state path false)
                         (dofor [c (get-children cluster-state path false)]
                           (let [data (-> (get-data cluster-state (str path "/" c) false)
-                                         maybe-deserialize)]
+                                       (maybe-deserialize Throwable))]
                             (when data
                               (struct TaskError (:error data) (:time-secs data) (:host data) (:port data))
                               )))

@@ -51,14 +51,14 @@ public class GzipSerializationDelegate implements SerializationDelegate {
     }
 
     @Override
-    public Object deserialize(byte[] bytes) {
+    public <T> T deserialize(byte[] bytes, Class<T> clazz) {
         try {
             ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
             GZIPInputStream gis = new GZIPInputStream(bis);
             ObjectInputStream ois = new ObjectInputStream(gis);
             Object ret = ois.readObject();
             ois.close();
-            return ret;
+            return (T)ret;
         } catch(IOException ioe) {
             throw new RuntimeException(ioe);
         } catch(ClassNotFoundException e) {

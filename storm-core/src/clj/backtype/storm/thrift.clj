@@ -155,7 +155,7 @@
   [^ComponentObject obj]
   (when (not= (.getSetField obj) ComponentObject$_Fields/SERIALIZED_JAVA)
     (throw (RuntimeException. "Cannot deserialize non-java-serialized object")))
-  (Utils/deserialize (.get_serialized_java obj)))
+  (Utils/deserialize (.get_serialized_java obj) (.getClass obj)))
 
 (defn serialize-component-object
   [obj]
