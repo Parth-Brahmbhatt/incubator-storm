@@ -15,7 +15,8 @@
 ;; limitations under the License.
 
 (ns backtype.storm.thrift
-  (:import [java.util HashMap])
+  (:import [java.util HashMap]
+           [java.io Serializable])
   (:import [backtype.storm.generated JavaObject Grouping Nimbus StormTopology
             StormTopology$_Fields Bolt Nimbus$Client Nimbus$Iface
             ComponentCommon Grouping$_Fields SpoutSpec NullStruct StreamInfo
@@ -155,7 +156,7 @@
   [^ComponentObject obj]
   (when (not= (.getSetField obj) ComponentObject$_Fields/SERIALIZED_JAVA)
     (throw (RuntimeException. "Cannot deserialize non-java-serialized object")))
-  (Utils/deserialize (.get_serialized_java obj) (.getClass obj)))
+  (Utils/deserialize (.get_serialized_java obj) Serializable))
 
 (defn serialize-component-object
   [obj]

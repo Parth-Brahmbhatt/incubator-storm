@@ -629,7 +629,7 @@
   [time-ms]
   (- (System/currentTimeMillis) (long time-ms)))
 
-(defn parse-int
+(defnk parse-int
   [str]
   (Integer/valueOf str))
 

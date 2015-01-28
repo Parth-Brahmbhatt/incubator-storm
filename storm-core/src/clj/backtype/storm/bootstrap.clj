@@ -56,8 +56,7 @@
                      SpoutStats BoltStats ErrorInfo SupervisorSummary ExecutorInfo
                      KillOptions SubmitOptions RebalanceOptions JavaObject JavaObjectArg
                      TopologyInitialStatus AuthorizationException]))
-     (import (quote [backtype.storm.daemon.common StormBase Assignment
-                     SupervisorInfo WorkerHeartbeat]))
+     (import (quote [backtype.storm.daemon.common WorkerHeartbeat]))
      (import (quote [backtype.storm.grouping CustomStreamGrouping]))
      (import (quote [java.io File FileOutputStream FileInputStream]))
      (import (quote [java.util Collection List Random Map HashMap Collections ArrayList LinkedList]))

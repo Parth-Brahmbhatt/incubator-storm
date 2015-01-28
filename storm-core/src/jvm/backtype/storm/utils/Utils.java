@@ -17,15 +17,7 @@
  */
 package backtype.storm.utils;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.ByteBuffer;
@@ -231,7 +223,7 @@ public class Utils {
 
     public static Object getSetComponentObject(ComponentObject obj) {
         if(obj.getSetField()==ComponentObject._Fields.SERIALIZED_JAVA) {
-            return Utils.deserialize(obj.get_serialized_java(), obj.getClass());
+            return Utils.deserialize(obj.get_serialized_java(), Serializable.class);
         } else if(obj.getSetField()==ComponentObject._Fields.JAVA_OBJECT) {
             return obj.get_java_object();
         } else {

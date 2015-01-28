@@ -16,7 +16,7 @@
 (ns backtype.storm.daemon.nimbus
   (:import [java.nio ByteBuffer]
            [java.util Collections]
-           [backtype.storm.generated StormTopology])
+           [backtype.storm.generated StormTopology TopologyStatus])
   (:import [java.io FileNotFoundException])
   (:import [java.nio.channels Channels WritableByteChannel])
   (:import [backtype.storm.security.auth ThriftServer ThriftConnectionType ReqContext AuthUtils])
@@ -123,8 +123,7 @@
                    storm-id
                    delay
                    :remove)
-      {:type :killed
-       :kill-time-secs delay})
+      {:type :killed})
     ))
 
 (defn rebalance-transition [nimbus storm-id status]
@@ -136,7 +135,11 @@
       (delay-event nimbus
                    storm-id
                    delay
-                   :do-rebalance)
+                   [:do-rebalance
+                    status
+                    num-workers
+                    executor-overrides
+                    ])
       {:type :rebalancing
        :delay-secs delay
        :old-status status
@@ -145,13 +148,14 @@
        })))
 
 (defn do-rebalance [nimbus storm-id status]
-  (.update-storm! (:storm-cluster-state nimbus)
-                  storm-id
-                  (assoc-non-nil
-                    {:component->executors (:executor-overrides status)}
-                    :num-workers
-                    (:num-workers status)))
-  (mk-assignments nimbus :scratch-topology-id storm-id))
+  (fn [old-status num-workers executor-overrides]
+    (.update-storm! (:storm-cluster-state nimbus)
+      storm-id
+      (assoc-non-nil
+        {:component->executors executor-overrides}
+        :num-workers num-workers))
+    (mk-assignments nimbus :scratch-topology-id storm-id)
+    old-status))
 
 (defn state-transitions [nimbus storm-id status]
   {:active {:inactivate :inactive            
@@ -166,7 +170,7 @@
               }
    :killed {:startup (fn [] (delay-event nimbus
                                          storm-id
-                                         (:kill-time-secs status)
+                                         (get (read-storm-conf (:conf nimbus) storm-id) TOPOLOGY-MESSAGE-TIMEOUT-SECS)
                                          :remove)
                              nil)
             :kill (kill-transition nimbus storm-id)
@@ -176,19 +180,13 @@
                                       storm-id)
                       nil)
             }
-   :rebalancing {:startup (fn [] (delay-event nimbus
-                                              storm-id
-                                              (:delay-secs status)
-                                              :do-rebalance)
-                                 nil)
+   :rebalancing {:startup :active
                  :kill (kill-transition nimbus storm-id)
-                 :do-rebalance (fn []
-                                 (do-rebalance nimbus storm-id status)
-                                 (:old-status status))
+                 :do-rebalance (do-rebalance nimbus storm-id status)
                  }})
 
 (defn topology-status [nimbus storm-id]
-  (-> nimbus :storm-cluster-state (.storm-base storm-id nil) :status))
+  (-> nimbus :storm-cluster-state (.storm-base storm-id nil) get-status))
 
 (defn transition!
   ([nimbus storm-id event]
@@ -301,7 +299,7 @@
         supervisor-infos (all-supervisor-info storm-cluster-state nil)
 
         supervisor-details (dofor [[id info] supervisor-infos]
-                             (SupervisorDetails. id (:meta info)))
+                             (SupervisorDetails. id (.get_meta info)))
 
         ret (.allSlotsAvailableForScheduling inimbus
                      supervisor-details
@@ -343,7 +341,7 @@
     (TopologyDetails. storm-id
                       topology-conf
                       topology
-                      (:num-workers storm-base)
+                      (.get_num_workers storm-base)
                       executor->component
                       )))
 
@@ -380,7 +378,7 @@
 (defn update-heartbeats! [nimbus storm-id all-executors existing-assignment]
   (log-debug "Updating heartbeats for " storm-id " " (pr-str all-executors))
   (let [storm-cluster-state (:storm-cluster-state nimbus)
-        executor-beats (.executor-beats storm-cluster-state storm-id (:executor->node+port existing-assignment))
+        executor-beats (.executor-beats storm-cluster-state storm-id (get_executor_node_port existing-assignment))
         cache (update-heartbeat-cache (@(:heartbeats-cache nimbus) storm-id)
                                       executor-beats
                                       all-executors
@@ -404,7 +402,7 @@
   ;; don't just rely on heartbeat being the same
   (let [conf (:conf nimbus)
         storm-id (.getId topology-details)
-        executor-start-times (:executor->start-time-secs existing-assignment)
+        executor-start-times (.get_executor_start_time_secs existing-assignment)
         heartbeats-cache (@(:heartbeats-cache nimbus) storm-id)]
     (->> all-executors
         (filter (fn [executor]
@@ -430,7 +428,7 @@
 (defn- compute-executors [nimbus storm-id]
   (let [conf (:conf nimbus)
         storm-base (.storm-base (:storm-cluster-state nimbus) storm-id nil)
-        component->executors (:component->executors storm-base)
+        component->executors (get_component_executors storm-base)
         storm-conf (read-storm-conf conf storm-id)
         topology (read-storm-topology conf storm-id)
         task->component (storm-task-info topology storm-conf)]
@@ -475,8 +473,8 @@
                                   :let [all-executors (topology->executors tid)
                                         alive-executors (topology->alive-executors tid)
                                         dead-executors (set/difference all-executors alive-executors)
-                                        dead-slots (->> (:executor->node+port assignment)
-                                                        (filter #(contains? dead-executors (first %)))
+                                        dead-slots (->> (get_executor_node_port assignment)
+                                                        (filter #(contains? dead-executors (first %)) )
                                                         vals)]]
                               dead-slots))
         supervisor->dead-ports (->> dead-slots
@@ -489,7 +487,7 @@
   "convert assignment information in zk to SchedulerAssignment, so it can be used by scheduler api."
   (into {} (for [[tid assignment] existing-assignments
                  :let [alive-executors (topology->alive-executors tid)
-                       executor->node+port (:executor->node+port assignment)
+                       executor->node+port (get_executor_node_port assignment)
                        executor->slot (into {} (for [[executor [node port]] executor->node+port]
                                                  ;; filter out the dead executors
                                                  (if (contains? alive-executors executor)
@@ -505,8 +503,8 @@
         supervisor-infos (all-supervisor-info storm-cluster-state)
         nonexistent-supervisor-slots (apply dissoc all-scheduling-slots (keys supervisor-infos))
         all-supervisor-details (into {} (for [[sid supervisor-info] supervisor-infos
-                                              :let [hostname (:hostname supervisor-info)
-                                                    scheduler-meta (:scheduler-meta supervisor-info)
+                                              :let [hostname (.get_hostname supervisor-info)
+                                                    scheduler-meta (.get_scheduler_meta supervisor-info)
                                                     dead-ports (supervisor->dead-ports sid)
                                                     ;; hide the dead-ports from the all-ports
                                                     ;; these dead-ports can be reused in next round of assignments
@@ -607,19 +605,21 @@
         new-topology->executor->node+port (compute-topology->executor->node+port new-scheduler-assignments)]
     (reset! (:id->sched-status nimbus) (.getStatusMap cluster))
     ;; print some useful information.
+    (if (and (not-nil? existing-assignments) (not (empty? existing-assignments)))
     (doseq [[topology-id executor->node+port] new-topology->executor->node+port
             :let [old-executor->node+port (-> topology-id
                                           existing-assignments
-                                          :executor->node+port)
+                                          get_executor_node_port)
                   reassignment (filter (fn [[executor node+port]]
                                          (and (contains? old-executor->node+port executor)
                                               (not (= node+port (old-executor->node+port executor)))))
                                        executor->node+port)]]
+
       (when-not (empty? reassignment)
         (let [new-slots-cnt (count (set (vals executor->node+port)))
               reassign-executors (keys reassignment)]
           (log-message "Reassigning " topology-id " to " new-slots-cnt " slots")
-          (log-message "Reassign executors: " (vec reassign-executors)))))
+          (log-message "Reassign executors: " (vec reassign-executors))))))
 
     new-topology->executor->node+port))
 
@@ -633,10 +633,10 @@
     ))
 
 (defn newly-added-slots [existing-assignment new-assignment]
-  (let [old-slots (-> (:executor->node+port existing-assignment)
+  (let [old-slots (-> (get_executor_node_port  existing-assignment)
                       vals
                       set)
-        new-slots (-> (:executor->node+port new-assignment)
+        new-slots (-> (get_executor_node_port new-assignment)
                       vals
                       set)]
     (set/difference new-slots old-slots)))
@@ -646,7 +646,7 @@
   (let [infos (all-supervisor-info storm-cluster-state)]
     (->> infos
          (map (fn [[id info]]
-                 [id (SupervisorDetails. id (:hostname info) (:scheduler-meta info) nil)]))
+                 [id (SupervisorDetails. id (.get_hostname info) (.get_scheduler_meta info) nil)]))
          (into {}))))
 
 (defn- to-worker-slot [[node port]]
@@ -697,14 +697,14 @@
                                                                           [[node host]]
                                                                           )))
                                                               (into {}))
-                                              all-node->host (merge (:node->host existing-assignment) node->host)
-                                              reassign-executors (changed-executors (:executor->node+port existing-assignment) executor->node+port)
-                                              start-times (merge (:executor->start-time-secs existing-assignment)
+                                              all-node->host (merge (get_node_host existing-assignment) node->host)
+                                              reassign-executors (changed-executors (get_executor_node_port existing-assignment) executor->node+port)
+                                              start-times (merge (if (not (nil? existing-assignment)) (into {} (.get_executor_start_time_secs existing-assignment)) {})
                                                                 (into {}
                                                                       (for [id reassign-executors]
                                                                         [id now-secs]
                                                                         )))]]
-                                   {topology-id (Assignment.
+                                   {topology-id (mk-assignment
                                                  (master-stormdist-root conf topology-id)
                                                  (select-keys all-node->host all-nodes)
                                                  executor->node+port
@@ -731,7 +731,7 @@
     ))
 
 (defn- start-storm [nimbus storm-name storm-id topology-initial-status]
-  {:pre [(#{:active :inactive} topology-initial-status)]}                
+  {:pre [(#{TopologyInitialStatus/ACTIVE TopologyInitialStatus/INACTIVE} topology-initial-status)]}
   (let [storm-cluster-state (:storm-cluster-state nimbus)
         conf (:conf nimbus)
         storm-conf (read-storm-conf conf storm-id)
@@ -740,9 +740,9 @@
     (log-message "Activating " storm-name ": " storm-id)
     (.activate-storm! storm-cluster-state
                       storm-id
-                      (StormBase. storm-name
+                      (mk-stormBase storm-name
                                   (current-time-secs)
-                                  {:type topology-initial-status}
+                                  (TopologyStatus/findByValue (.getValue topology-initial-status))
                                   (storm-conf TOPOLOGY-WORKERS)
                                   num-executors
                                   (storm-conf TOPOLOGY-SUBMITTER-USER)))))
@@ -794,7 +794,7 @@
     ))
 
 (defn extract-status-str [base]
-  (let [t (-> base :status :type)]
+  (let [t (-> base get-status :type)]
     (.toUpperCase (name t))
     ))
 
@@ -1072,9 +1072,7 @@
               (.set-credentials! storm-cluster-state storm-id credentials storm-conf)
               (setup-storm-code conf storm-id uploadedJarLocation storm-conf topology)
               (.setup-heartbeats! storm-cluster-state storm-id)
-              (let [thrift-status->kw-status {TopologyInitialStatus/INACTIVE :inactive
-                                              TopologyInitialStatus/ACTIVE :active}]
-                (start-storm nimbus storm-name storm-id (thrift-status->kw-status (.get_initial_status submitOptions))))
+              (start-storm nimbus storm-name storm-id (.get_initial_status submitOptions))
               (mk-assignments nimbus)))
           (catch Throwable e
             (log-warn-error e "Topology submission exception. (topology name='" storm-name "')")
@@ -1220,12 +1218,12 @@
               ;; TODO: need to get the port info about supervisors...
               ;; in standalone just look at metadata, otherwise just say N/A?
               supervisor-summaries (dofor [[id info] supervisor-infos]
-                                          (let [ports (set (:meta info)) ;;TODO: this is only true for standalone
+                                          (let [ports (set (.get_meta info)) ;;TODO: this is only true for standalone
                                                 ]
-                                            (SupervisorSummary. (:hostname info)
-                                                                (:uptime-secs info)
+                                            (SupervisorSummary. (.get_hostname info)
+                                                                (.get_uptime_secs info)
                                                                 (count ports)
-                                                                (count (:used-ports info))
+                                                                (count (.get_used_ports info))
                                                                 id )
                                             ))
               nimbus-uptime ((:uptime nimbus))
@@ -1233,21 +1231,21 @@
               topology-summaries (dofor [[id base] bases :when base]
 	                                  (let [assignment (.assignment-info storm-cluster-state id nil)
                                                 topo-summ (TopologySummary. id
-                                                            (:storm-name base)
-                                                            (->> (:executor->node+port assignment)
+                                                            (.get_name base)
+                                                            (->> (get_executor_node_port assignment)
                                                                  keys
                                                                  (mapcat executor-id->tasks)
                                                                  count) 
-                                                            (->> (:executor->node+port assignment)
+                                                            (->> (get_executor_node_port assignment)
                                                                  keys
                                                                  count)                                                            
-                                                            (->> (:executor->node+port assignment)
+                                                            (->> (get_executor_node_port assignment)
                                                                  vals
                                                                  set
                                                                  count)
-                                                            (time-delta (:launch-time-secs base))
+                                                            (time-delta (.get_launch_time_secs base))
                                                             (extract-status-str base))]
-                                               (when-let [owner (:owner base)] (.set_owner topo-summ owner))
+                                               (when-let [owner (.get_owner base)] (.set_owner topo-summ owner))
                                                (when-let [sched-status (.get @(:id->sched-status nimbus) id)] (.set_sched_status topo-summ sched-status))
                                                topo-summ
                                           ))]
@@ -1263,15 +1261,15 @@
               _ (check-authorization! nimbus storm-name topology-conf "getTopologyInfo")
               task->component (storm-task-info (try-read-storm-topology conf storm-id) topology-conf)
               base (.storm-base storm-cluster-state storm-id nil)
-              launch-time-secs (if base (:launch-time-secs base) (throw (NotAliveException. (str storm-id))))
+              launch-time-secs (if base (.get_launch_time_secs base) (throw (NotAliveException. (str storm-id))))
               assignment (.assignment-info storm-cluster-state storm-id nil)
               beats (map-val :heartbeat (get @(:heartbeats-cache nimbus) storm-id))
               all-components (-> task->component reverse-map keys)
               errors (->> all-components
                           (map (fn [c] [c (get-errors storm-cluster-state storm-id c)]))
                           (into {}))
-              executor-summaries (dofor [[executor [node port]] (:executor->node+port assignment)]
-                                        (let [host (-> assignment :node->host (get node))
+              executor-summaries (dofor [[executor [node port]] (get_executor_node_port assignment)]
+                                        (let [host (-> assignment get_node_host (get node))
                                               heartbeat (get beats executor)
                                               stats (:stats heartbeat)
                                               stats (if stats
@@ -1291,7 +1289,7 @@
                            (extract-status-str base)
                            errors
                            )]
-            (when-let [owner (:owner base)] (.set_owner topo-info owner))
+            (when-let [owner (.get_owner base)] (.set_owner topo-info owner))
             (when-let [sched-status (.get @(:id->sched-status nimbus) storm-id)] (.set_sched_status topo-info sched-status))
             topo-info
           ))

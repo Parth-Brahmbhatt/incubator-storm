@@ -38,7 +38,7 @@
   (let [state (:storm-cluster-state cluster)
         slot-assigns (for [storm-id (.assignments state nil)]
                         (let [executors (-> (.assignment-info state storm-id nil)
-                                        :executor->node+port
+                                          get_executor_node_port
                                         reverse-map
                                         (get [supervisor-id port] ))]
                           (when executors [storm-id executors])

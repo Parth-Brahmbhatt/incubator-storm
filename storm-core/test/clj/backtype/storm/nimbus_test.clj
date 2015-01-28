@@ -17,7 +17,8 @@
   (:use [clojure test])
   (:require [backtype.storm [util :as util]])
   (:require [backtype.storm.daemon [nimbus :as nimbus]])
-  (:import [backtype.storm.testing TestWordCounter TestWordSpout TestGlobalCount TestAggregatesCounter])
+  (:import [backtype.storm.testing TestWordCounter TestWordSpout TestGlobalCount TestAggregatesCounter]
+           [backtype.storm.generated TopologyInitialStatus])
   (:import [backtype.storm.scheduler INimbus])
   (:import [backtype.storm.generated Credentials])
   (:use [backtype.storm bootstrap testing MockAutoCred])
@@ -48,7 +49,7 @@
         state (:storm-cluster-state cluster)
         get-component (comp task->component first)]
     (->> (.assignment-info state storm-id nil)
-         :executor->node+port
+         get_executor_node_port
          keys
          (map (fn [e] {e (get-component e)}))
          (apply merge)
@@ -57,14 +58,14 @@
 (defn storm-num-workers [state storm-name]
   (let [storm-id (get-storm-id state storm-name)
         assignment (.assignment-info state storm-id nil)]
-    (count (reverse-map (:executor->node+port assignment)))
+    (count (reverse-map (get_executor_node_port assignment)))
     ))
 
 (defn topology-nodes [state storm-name]
   (let [storm-id (get-storm-id state storm-name)
         assignment (.assignment-info state storm-id nil)]
     (->> assignment
-         :executor->node+port
+         get_executor_node_port
          vals
          (map first)
          set         
@@ -74,7 +75,7 @@
   (let [storm-id (get-storm-id state storm-name)
         assignment (.assignment-info state storm-id nil)]
     (->> assignment
-         :executor->node+port
+         get_executor_node_port
          vals
          set         
          )))
@@ -83,7 +84,7 @@
   (let [storm-id (get-storm-id state storm-name)
         assignment (.assignment-info state storm-id nil)]
     (->> assignment
-         :executor->node+port
+         get_executor_node_port
          vals
          set
          (group-by first)
@@ -98,17 +99,17 @@
 (defn executor-assignment [cluster storm-id executor-id]
   (let [state (:storm-cluster-state cluster)
         assignment (.assignment-info state storm-id nil)]
-    ((:executor->node+port assignment) executor-id)
+    ((get_executor_node_port assignment) executor-id)
     ))
 
 (defn executor-start-times [cluster storm-id]
   (let [state (:storm-cluster-state cluster)
         assignment (.assignment-info state storm-id nil)]
-    (:executor->start-time-secs assignment)))
+    (.get_executor_start_time_secs assignment)))
 
 (defn do-executor-heartbeat [cluster storm-id executor]
   (let [state (:storm-cluster-state cluster)
-        executor->node+port (:executor->node+port (.assignment-info state storm-id nil))
+        executor->node+port (get_executor_node_port (.assignment-info state storm-id nil))
         [node port] (get executor->node+port executor)
         curr-beat (.get-worker-heartbeat state storm-id node port)
         stats (:executor-stats curr-beat)]
@@ -119,7 +120,7 @@
 (defn slot-assignments [cluster storm-id]
   (let [state (:storm-cluster-state cluster)
         assignment (.assignment-info state storm-id nil)]
-    (reverse-map (:executor->node+port assignment))
+    (reverse-map (get_executor_node_port assignment))
     ))
 
 (defn task-ids [cluster storm-id]
@@ -131,7 +132,7 @@
 (defn topology-executors [cluster storm-id]
   (let [state (:storm-cluster-state cluster)
         assignment (.assignment-info state storm-id nil)]
-    (keys (:executor->node+port assignment))
+    (keys (get_executor_node_port assignment))
     ))
 
 (defn check-distribution [items distribution]
@@ -149,7 +150,7 @@
         storm-id (get-storm-id state storm-name)
         task-ids (task-ids cluster storm-id)
         assignment (.assignment-info state storm-id nil)
-        executor->node+port (:executor->node+port assignment)
+        executor->node+port (get_executor_node_port assignment)
         task->node+port (to-task->node+port executor->node+port)
         assigned-task-ids (mapcat executor-id->tasks (keys executor->node+port))
         all-nodes (set (map first (vals executor->node+port)))]
@@ -161,9 +162,9 @@
       (is (not-nil? s)))
     
     ;;(map str (-> (Thread/currentThread) .getStackTrace))
-    (is (= all-nodes (set (keys (:node->host assignment)))))
+    (is (= all-nodes (set (keys (get_node_host assignment)))))
     (doseq [[e s] executor->node+port]
-      (is (not-nil? ((:executor->start-time-secs assignment) e))))
+      (is (not-nil? ((.get_executor_start_time_secs assignment) e))))
     ))
 
  	
@@ -398,7 +399,7 @@
       (is (not-nil? (.assignment-info state storm-id nil)))
       (.killTopology (:nimbus cluster) "test")
       ;; check that storm is deactivated but alive
-      (is (= :killed (-> (.storm-base state storm-id nil) :status :type)))
+      (is (= :killed (-> (.storm-base state storm-id nil) get-status :type)))
       (is (not-nil? (.assignment-info state storm-id nil)))
       (advance-cluster-time cluster 18)
       ;; check that storm is deactivated but alive
@@ -771,7 +772,7 @@
  (let [assignments (.assignments state nil)]
    (log-message "Assignemts: " assignments)
    (let [id->node->ports (into {} (for [id assignments
-                                                :let [executor->node+port (:executor->node+port (.assignment-info state id nil))
+                                                :let [executor->node+port (get_executor_node_port (.assignment-info state id nil))
                                                       node+ports (set (.values executor->node+port))
                                                       node->ports (apply merge-with (fn [a b] (distinct (concat a b))) (for [[node port] node+ports] {node [port]}))]]
                                                 {id node->ports}))
@@ -1097,13 +1098,9 @@
           bogus-type "bogusType"
           bogus-bases {
                  "1" nil
-                 "2" {:launch-time-secs bogus-secs
-                        :storm-name "id2-name"
-                        :status {:type bogus-type}}
+                 "2" (mk-stormBase  "id2-name" bogus-secs TopologyStatus/ACTIVE 0 {} nil)
                  "3" nil
-                 "4" {:launch-time-secs bogus-secs
-                        :storm-name "id4-name"
-                        :status {:type bogus-type}}
+                 "4" (mk-stormBase  "id4-name" bogus-secs TopologyStatus/ACTIVE 0 {} nil)
                 }
         ]
       (stubbing [topology-bases bogus-bases]

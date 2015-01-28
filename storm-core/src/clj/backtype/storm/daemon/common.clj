@@ -16,7 +16,7 @@
 (ns backtype.storm.daemon.common
   (:use [backtype.storm log config util])
   (:import [backtype.storm.generated StormTopology
-            InvalidTopologyException GlobalStreamId])
+            InvalidTopologyException GlobalStreamId SupervisorInfo Assignment StormBase TopologyStatus])
   (:import [backtype.storm.utils Utils])
   (:import [backtype.storm.task WorkerTopologyContext])
   (:import [backtype.storm Constants])
@@ -44,16 +44,96 @@
 (def METRICS-TICK-STREAM-ID Constants/METRICS_TICK_STREAM_ID)
 (def CREDENTIALS-CHANGED-STREAM-ID Constants/CREDENTIALS_CHANGED_STREAM_ID)
 
+(defn mk-supervisor-info [time-secs hostname assignment-id used-ports meta scheduler-meta uptime-secs]
+  (let [supervisor-info (SupervisorInfo.)]
+    (.set_time_secs supervisor-info time-secs)
+    (.set_hostname supervisor-info hostname)
+    (.set_assignment_id supervisor-info assignment-id)
+    (.set_used_ports supervisor-info used-ports)
+    (.set_meta supervisor-info meta)
+    (.set_scheduler_meta supervisor-info scheduler-meta)
+    (.set_uptime_secs supervisor-info uptime-secs)
+    supervisor-info))
+
 ;; the task id is the virtual port
 ;; node->host is here so that tasks know who to talk to just from assignment
 ;; this avoid situation where node goes down and task doesn't know what to do information-wise
-(defrecord Assignment [master-code-dir node->host executor->node+port executor->start-time-secs])
+(defn mk-assignment [master-code-dir node->host executor->node+port executor->start-time-secs]
+  (let [assignment (Assignment.)]
+    (.set_master_code_dir assignment master-code-dir)
+    (.set_node_host assignment node->host)
+    ;a map of list of executors to node and port, the node and port are stored as the first and second item of a list
+    ; instead of having a structure of its own. thrift and most sane serialization protocols do not support having an
+    ; open type that can support bot strings and ints. So we just convert both node and port to string here.
+    (.set_executor_node_port assignment (map-val (fn [x] (map #(String/valueOf %1) x)) executor->node+port))
+    (.set_executor_start_time_secs assignment executor->start-time-secs)
+    assignment))
 
+(defnk parse-int-maybe
+  [str]
+  (try (Integer/valueOf str)
+    (catch NumberFormatException e
+      str)))
+
+(defn get_executor_node_port [assignment]
+  (if assignment
+    (into {}
+      (map-val
+        (fn[x]
+          (map #(parse-int-maybe %1) x))
+        (map-key
+          (fn[i]
+            (into [] i))
+        (.get_executor_node_port assignment))))
+    {}))
+
+(defn get_node_host [assignment]
+  (if assignment
+    (into {} (.get_node_host assignment))
+    {}))
 
 ;; component->executors is a map from spout/bolt id to number of executors for that component
-(defrecord StormBase [storm-name launch-time-secs status num-workers component->executors owner])
+(defn mk-stormBase [storm-name launch-time-secs status num-workers component->executors owner]
+  (let [storm-base (StormBase.)]
+    (.set_name storm-base storm-name)
+    (.set_launch_time_secs storm-base launch-time-secs)
+    (.set_status storm-base status)
+    (.set_num_workers storm-base num-workers)
+    (.set_component_executors storm-base component->executors)
+    (.set_owner storm-base owner)
+    storm-base))
 
-(defrecord SupervisorInfo [time-secs hostname assignment-id used-ports meta scheduler-meta uptime-secs])
+(defn get-status [storm-base]
+  (if storm-base
+    (condp = (.get_status storm-base)
+      TopologyStatus/ACTIVE {:type :active}
+      TopologyStatus/INACTIVE {:type :inactive}
+      TopologyStatus/REBALANCING {:type :rebalancing}
+      TopologyStatus/KILLED {:type :killed}
+      {:type :unknown-status})
+    nil))
+
+(defn- convert-to-status-from-symbol [status]
+  (condp = (:type status)
+    :active TopologyStatus/ACTIVE
+    :inactive TopologyStatus/INACTIVE
+    :rebalancing TopologyStatus/REBALANCING
+    :killed TopologyStatus/KILLED
+    nil))
+
+(defn get_component_executors[storm-base]
+  (if storm-base
+    (into {} (.get_component_executors storm-base))
+    {}))
+
+(defn update-storm-base [old new]
+  (let [new-executors (:component->executors new)
+        status (convert-to-status-from-symbol (:status new))
+        num-worker (:num-workers new)]
+    (if new-executors (.set_component_executors old (merge (get_component_executors old) new-executors)))
+    (if status (.set_status old status))
+    (if num-worker (.set_num_workers old num-worker)))
+  old)
 
 (defprotocol DaemonCommon
   (waiting? [this]))
@@ -81,7 +161,7 @@
 (defn get-storm-id [storm-cluster-state storm-name]
   (let [active-storms (.active-storms storm-cluster-state)]
     (find-first
-      #(= storm-name (:storm-name (.storm-base storm-cluster-state % nil)))
+      #(= storm-name (.get_name (.storm-base storm-cluster-state % nil)))
       active-storms)
     ))
 

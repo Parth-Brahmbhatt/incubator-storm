@@ -33,7 +33,7 @@
 
 (defn read-worker-executors [storm-conf storm-cluster-state storm-id assignment-id port assignment-versions]
   (log-message "Reading Assignments.")
-  (let [assignment (:executor->node+port (.assignment-info storm-cluster-state storm-id nil))]
+  (let [assignment (get_executor_node_port (.assignment-info storm-cluster-state storm-id nil))]
     (doall
      (concat     
       [Constants/SYSTEM_EXECUTOR_ID]
@@ -276,7 +276,7 @@
                               (swap! (:assignment-versions worker) assoc storm-id new-assignment)
                               (:data new-assignment)))
               my-assignment (-> assignment
-                                :executor->node+port
+                                get_executor_node_port
                                 to-task->node+port
                                 (select-keys outbound-tasks)
                                 (#(map-val endpoint->string %)))
@@ -298,7 +298,7 @@
                           (.connect
                            ^IContext (:mq-context worker)
                            storm-id
-                           ((:node->host assignment) node)
+                           ((get_node_host assignment) node)
                            port)
                           ]
                          )))
@@ -325,7 +325,7 @@
     (let [base (.storm-base (:storm-cluster-state worker) (:storm-id worker) callback)]
      (reset!
       (:storm-active-atom worker)
-      (= :active (-> base :status :type))
+      (= :active (-> base get-status :type))
       ))
      ))
 

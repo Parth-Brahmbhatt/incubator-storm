@@ -279,7 +279,7 @@
     (let [topology (.getByName topologies storm-name)
           topology-id (.getId topology)
           existing-assignments (into {} (for [[tid assignment] existing-assignments]
-                                          {tid (:executor->node+port assignment)}))
+                                          {tid (common/get_executor_node_port assignment)}))
           new-assignments (assoc existing-assignments topology-id executor->node+port)]
       new-assignments)))
 

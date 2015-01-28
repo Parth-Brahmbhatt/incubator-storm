@@ -15,7 +15,8 @@
 ;; limitations under the License.
 
 (ns backtype.storm.cluster
-  (:import [org.apache.zookeeper.data Stat ACL Id])
+  (:import [org.apache.zookeeper.data Stat ACL Id]
+           [backtype.storm.generated SupervisorInfo Assignment StormBase])
   (:import [org.apache.zookeeper KeeperException KeeperException$NoNodeException ZooDefs ZooDefs$Ids ZooDefs$Perms])
   (:import [backtype.storm.utils Utils])
   (:import [java.security MessageDigest])
@@ -292,7 +293,7 @@
         [this storm-id callback]
         (when callback
           (swap! assignment-info-callback assoc storm-id callback))
-        (maybe-deserialize (get-data cluster-state (assignment-path storm-id) (not-nil? callback)) backtype.storm.daemon.common.Assignment))
+        (maybe-deserialize (get-data cluster-state (assignment-path storm-id) (not-nil? callback)) Assignment))
 
       (assignment-info-with-version 
         [this storm-id callback]
@@ -300,7 +301,7 @@
           (swap! assignment-info-with-version-callback assoc storm-id callback))
         (let [{data :data version :version} 
               (get-data-with-version cluster-state (assignment-path storm-id) (not-nil? callback))]
-        {:data (maybe-deserialize data backtype.storm.daemon.common.Assignment)
+        {:data (maybe-deserialize data Assignment)
          :version version}))
 
       (assignment-version 
@@ -348,7 +349,7 @@
 
       (supervisor-info
         [this supervisor-id]
-        (maybe-deserialize (get-data cluster-state (supervisor-path supervisor-id) false) backtype.storm.daemon.common.SupervisorInfo))
+        (maybe-deserialize (get-data cluster-state (supervisor-path supervisor-id) false) SupervisorInfo))
 
       (worker-heartbeat!
         [this storm-id node port info]
@@ -386,12 +387,10 @@
 
       (update-storm!
         [this storm-id new-elems]
-        (let [base (storm-base this storm-id nil)
-              executors (:component->executors base)
-              new-elems (update new-elems :component->executors (partial merge executors))]
+        (let [base (storm-base this storm-id nil)]
           (set-data cluster-state (storm-path storm-id)
                     (-> base
-                        (merge new-elems)
+                        (common/update-storm-base new-elems)
                         Utils/serialize)
                     acls)))
 
@@ -399,7 +398,7 @@
         [this storm-id callback]
         (when callback
           (swap! storm-base-callback assoc storm-id callback))
-        (maybe-deserialize (get-data cluster-state (storm-path storm-id) (not-nil? callback)) backtype.storm.daemon.common.StormBase))
+        (maybe-deserialize (get-data cluster-state (storm-path storm-id) (not-nil? callback)) StormBase))
 
       (remove-storm-base!
         [this storm-id]

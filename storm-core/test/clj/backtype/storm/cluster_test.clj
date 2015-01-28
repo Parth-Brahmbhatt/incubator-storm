@@ -15,7 +15,7 @@
 ;; limitations under the License.
 (ns backtype.storm.cluster-test
   (:import [java.util Arrays])
-  (:import [backtype.storm.daemon.common Assignment StormBase SupervisorInfo])
+  (:import [backtype.storm.generated Assignment StormBase TopologyStatus])
   (:import [org.apache.zookeeper ZooDefs ZooDefs$Ids])
   (:import [org.mockito Mockito])
   (:import [org.mockito.exceptions.base MockitoAssertionError])
@@ -25,7 +25,8 @@
   (:require [conjure.core])
   (:use [conjure core])
   (:use [clojure test])
-  (:use [backtype.storm cluster config util testing]))
+  (:use [backtype.storm cluster config util testing])
+  (:use [backtype.storm.daemon common]))
 
 (defn mk-config [zk-port]
   (merge (read-storm-config)
@@ -168,10 +169,10 @@
 (deftest test-storm-cluster-state-basics
   (with-inprocess-zookeeper zk-port
     (let [state (mk-storm-state zk-port)
-          assignment1 (Assignment. "/aaa" {} {1 [2 2002 1]} {})
-          assignment2 (Assignment. "/aaa" {} {1 [2 2002]} {})
-          base1 (StormBase. "/tmp/storm1" 1 {:type :active} 2 {} "")
-          base2 (StormBase. "/tmp/storm2" 2 {:type :active} 2 {} "")]
+          assignment1 (mk-assignment "/aaa" {} {1 [2 2002 1]} {})
+          assignment2 (mk-assignment "/aaa" {} {1 [2 2002]} {})
+          base1 (mk-stormBase "/tmp/storm1" 1 TopologyStatus/ACTIVE 2 {} "")
+          base2 (mk-stormBase "/tmp/storm2" 2 TopologyStatus/ACTIVE 2 {} "")]
       (is (= [] (.assignments state nil)))
       (.set-assignment! state "storm1" assignment1)
       (is (= assignment1 (.assignment-info state "storm1" nil)))

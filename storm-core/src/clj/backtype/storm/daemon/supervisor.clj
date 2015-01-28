@@ -16,6 +16,7 @@
 (ns backtype.storm.daemon.supervisor
   (:import [java.io OutputStreamWriter BufferedWriter IOException])
   (:import [backtype.storm.scheduler ISupervisor]
+           [backtype.storm.generated SupervisorInfo]
            [java.net JarURLConnection]
            [java.net URI])
   (:use [backtype.storm bootstrap])
@@ -61,7 +62,7 @@
 (defn- read-my-executors [assignments-snapshot storm-id assignment-id]
   (let [assignment (get assignments-snapshot storm-id)
         my-executors (filter (fn [[_ [node _]]] (= node assignment-id))
-                           (:executor->node+port assignment))
+                           (get_executor_node_port assignment))
         port-executors (apply merge-with
                           concat
                           (for [[executor [_ port]] my-executors]
@@ -89,7 +90,7 @@
 
 (defn- read-storm-code-locations
   [assignments-snapshot]
-  (map-val :master-code-dir assignments-snapshot))
+  (map-val (fn [assignment] (.get_master_code_dir assignment)) assignments-snapshot))
 
 (defn- read-downloaded-storm-ids [conf]
   (map #(url-decode %) (read-dir-contents (supervisor-stormdist-root conf)))
@@ -476,7 +477,7 @@
         heartbeat-fn (fn [] (.supervisor-heartbeat!
                                (:storm-cluster-state supervisor)
                                (:supervisor-id supervisor)
-                               (SupervisorInfo. (current-time-secs)
+                               (mk-supervisor-info (current-time-secs)
                                                 (:my-hostname supervisor)
                                                 (:assignment-id supervisor)
                                                 (keys @(:curr-assignment supervisor))

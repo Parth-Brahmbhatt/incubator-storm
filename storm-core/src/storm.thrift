@@ -238,9 +238,43 @@ enum TopologyInitialStatus {
     ACTIVE = 1,
     INACTIVE = 2
 }
+
+enum TopologyStatus {
+    ACTIVE = 1,
+    INACTIVE = 2,
+    REBALANCING = 3,
+    KILLED = 4
+}
+
 struct SubmitOptions {
   1: required TopologyInitialStatus initial_status;
   2: optional Credentials creds;
+}
+
+struct SupervisorInfo {
+    1: required i64 time_secs;
+    2: required string hostname;
+    3: required string assignment_id;
+    4: optional list<i32> used_ports = [];
+    5: optional list<i32> meta = [];
+    6: optional map<string, string> scheduler_meta = {};
+    7: required i64 uptime_secs;
+}
+
+struct Assignment {
+    1: required string master_code_dir;
+    2: optional map<string, string> node_host = {};
+    3: optional map<list<i32>, list<string>> executor_node_port = {};
+    4: optional map<list<i32>, i32> executor_start_time_secs = {};
+}
+
+struct StormBase {
+    1: required string name;
+    2: required TopologyStatus status;
+    3: required i64 num_workers;
+    4: optional map<string, i32> component_executors = {};
+    5: optional i32 launch_time_secs;
+    6: optional string owner;
 }
 
 service Nimbus {
