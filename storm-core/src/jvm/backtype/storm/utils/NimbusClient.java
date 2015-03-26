@@ -29,6 +29,7 @@ import backtype.storm.security.auth.ThriftConnectionType;
 import clojure.lang.IFn;
 import clojure.lang.PersistentArrayMap;
 import com.google.common.base.Splitter;
+import com.google.common.collect.Lists;
 import org.apache.thrift.transport.TTransportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +38,6 @@ import java.util.List;
 import java.util.Map;
 
 public class NimbusClient extends ThriftClient {
-    public static final String DELIMITER = ":";
     private Nimbus.Client _client;
     private static final Logger LOG = LoggerFactory.getLogger(NimbusClient.class);
 
@@ -55,17 +55,22 @@ public class NimbusClient extends ThriftClient {
             asUser = (String) conf.get(Config.STORM_DO_AS_USER);
         }
 
-        List<String> seeds = (List<String>) conf.get(Config.NIMBUS_SEEDS);
-        for (String seed : seeds) {
-            String[] split = seed.split(DELIMITER);
-            String host = split[0];
-            int port = Integer.parseInt(split[1]);
+        List<String> seeds = null;
+        if(conf.containsKey(Config.NIMBUS_HOST)) {
+            LOG.warn("Using deprecated config {} for backward compatibility. Please update your storm.yaml so it only has config {}",
+                    Config.NIMBUS_HOST, Config.NIMBUS_SEEDS);
+            seeds = Lists.newArrayList(conf.get(Config.NIMBUS_HOST).toString());
+        } else {
+            seeds = (List<String>) conf.get(Config.NIMBUS_SEEDS);
+        }
+        for (String host : seeds) {
+            int port = Integer.parseInt(conf.get(Config.NIMBUS_THRIFT_PORT).toString());
             ClusterSummary clusterInfo = null;
             try {
                 NimbusClient client = new NimbusClient(conf, host, port);
                 clusterInfo = client.getClient().getClusterInfo();
             } catch (Exception e) {
-                LOG.warn("Ignoring exception while trying to get leader nimbus info from " + seed
+                LOG.warn("Ignoring exception while trying to get leader nimbus info from " + host
                         + ". will retry with a different seed host.", e);
                 continue;
             }
@@ -76,7 +81,7 @@ public class NimbusClient extends ThriftClient {
                         try {
                             return new NimbusClient(conf, nimbusSummary.get_host(), nimbusSummary.get_port(), null, asUser);
                         } catch (TTransportException e) {
-                            String leaderNimbus = nimbusSummary.get_host() + DELIMITER + nimbusSummary.get_port();
+                            String leaderNimbus = nimbusSummary.get_host() + ":" + nimbusSummary.get_port();
                             throw new RuntimeException("Failed to create a nimbus client for the leader " + leaderNimbus, e);
                         }
                     }
@@ -86,7 +91,7 @@ public class NimbusClient extends ThriftClient {
             }
         }
         throw new RuntimeException("Could not find leader nimbus from seed hosts " + seeds + ". " +
-                "Did you specify a valid list of nimbus host:port for config " + Config.NIMBUS_SEEDS);
+                "Did you specify a valid list of nimbus hosts for config " + Config.NIMBUS_SEEDS);
     }
 
     public NimbusClient(Map conf, String host, int port) throws TTransportException {

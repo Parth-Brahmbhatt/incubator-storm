@@ -580,12 +580,12 @@
       (nimbus-summary
         (.get_nimbuses (.getClusterInfo ^Nimbus$Client nimbus)))))
   ([nimbuses]
-    (let [nimbus-seeds (set (*STORM-CONF* NIMBUS-SEEDS))
+    (let [nimbus-seeds (set (map #(str %1 ":" (*STORM-CONF* NIMBUS-THRIFT-PORT)) (set (*STORM-CONF* NIMBUS-SEEDS))))
           alive-nimbuses (set (map #(str (.get_host %1) ":" (.get_port %1)) nimbuses))
-          dead-nimbuses (clojure.set/difference nimbus-seeds alive-nimbuses)
-          dead-nimbuses-summary (map #(convert-to-nimbus-summary %1) dead-nimbuses)]
+          offline-nimbuses (clojure.set/difference nimbus-seeds alive-nimbuses)
+          offline-nimbuses-summary (map #(convert-to-nimbus-summary %1) offline-nimbuses)]
       {"nimbuses"
-       (concat dead-nimbuses-summary
+       (concat offline-nimbuses-summary
        (for [^NimbusSummary n nimbuses]
          {
           "host" (.get_host n)
