@@ -16,14 +16,15 @@
 
 (ns backtype.storm.ui.core
   (:use compojure.core)
-  (:use ring.middleware.reload)
+  (:use [clojure.java.shell :only [sh]])
+  (:use ring.middleware.reload
+        ring.middleware.multipart-params)
   (:use [ring.middleware.json :only [wrap-json-params]])
   (:use [hiccup core page-helpers])
   (:use [backtype.storm config util log zookeeper])
   (:use [backtype.storm.ui helpers])
   (:use [backtype.storm.daemon [common :only [ACKER-COMPONENT-ID ACKER-INIT-STREAM-ID ACKER-ACK-STREAM-ID
                                               ACKER-FAIL-STREAM-ID system-id? mk-authorization-handler]]])
-  (:use [ring.middleware.anti-forgery])
   (:use [clojure.string :only [blank? lower-case trim]])
   (:import [backtype.storm.utils Utils]
            [backtype.storm.generated NimbusSummary])
@@ -499,6 +500,39 @@
               (hashmap-to-persistent bolts))
        spout-comp-summs bolt-comp-summs window id))))
 
+(defn validate-tplg-submit-params [params]
+  (let [tplg-jar-file (params :topologyJar)
+        tplg-config (if (not-nil? (params :topologyConfig)) (from-json (params :topologyConfig)))]
+    (cond
+     (nil? tplg-jar-file) {:valid false :error "missing topology jar file"}
+     (nil? tplg-config) {:valid false :error "missing topology config"}
+     (nil? (tplg-config "topologyMainClass")) {:valid false :error "topologyMainClass missing in topologyConfig"}
+     :else {:valid true})))
+
+(defn run-tplg-submit-cmd [tplg-jar-file tplg-config user]
+  (let [tplg-main-class (if (not-nil? tplg-config) (trim (tplg-config "topologyMainClass")))
+        tplg-main-class-args (if (not-nil? tplg-config) (clojure.string/join " " (tplg-config "topologyMainClassArgs")))
+        tplg-jvm-opts (if (not-nil? tplg-config) (clojure.string/join " " (tplg-config "topologyJvmOpts")))
+        storm-home (System/getProperty "storm.home")
+        storm-conf-dir (str storm-home file-path-separator "conf")
+        storm-log-dir (if (not-nil? (*STORM-CONF* "storm.log.dir")) (*STORM-CONF* "storm.log.dir")
+                          (str storm-home file-path-separator "logs"))
+        storm-libs (str storm-home file-path-separator "lib" file-path-separator "*")
+        java-cmd (str (System/getProperty "java.home") file-path-separator "bin" file-path-separator "java")
+        storm-cmd (str storm-home file-path-separator "bin" file-path-separator "storm")
+        tplg-cmd-response (sh storm-cmd "jar" tplg-jar-file
+                              tplg-main-class
+                              tplg-main-class-args
+                              (if (not= user "unknown") (str "-c storm.doAsUser=" user) ""))]
+    (log-message "tplg-cmd-response " tplg-cmd-response)
+    (cond
+     (= (tplg-cmd-response :exit) 0) {"status" "success"}
+     (and (not= (tplg-cmd-response :exit) 0)
+          (not-nil? (re-find #"already exists on cluster" (tplg-cmd-response :err)))) {"status" "failed" "error" "Topology with the same name exists in cluster"}
+          (not= (tplg-cmd-response :exit) 0) {"status" "failed" "error" (clojure.string/trim-newline (tplg-cmd-response :err))}
+          :else {"status" "success" "response" "topology deployed"}
+          )))
+
 (defn cluster-configuration []
   (thrift/with-configured-nimbus-connection nimbus
     (.getNimbusConf ^Nimbus$Client nimbus)))
@@ -529,21 +563,37 @@
         "executorsTotal" total-executors
         "tasksTotal" total-tasks })))
 
+(defn convert-to-nimbus-summary[nimbus-seed]
+  (let [[host port] (.split nimbus-seed ":")]
+    {
+      "host" host
+      "port" port
+      "nimbusLogLink" (nimbus-log-link host port)
+      "status" "Offline"
+      "version" "Not applicable"
+      "nimbusUpTime" "Not applicable"}
+    ))
+
 (defn nimbus-summary
   ([]
     (thrift/with-configured-nimbus-connection nimbus
       (nimbus-summary
         (.get_nimbuses (.getClusterInfo ^Nimbus$Client nimbus)))))
   ([nimbuses]
-    {"nimbuses"
-     (for [^NimbusSummary n nimbuses]
-       {
-        "host" (.get_host n)
-        "port" (.get_port n)
-        "nimbusLogLink" (nimbus-log-link (.get_host n) (.get_port n))
-        "isLeader" (.is_isLeader n)
-        "version" (.get_version n)
-        "nimbusUpTime" (pretty-uptime-sec (.get_uptime_secs n))})}))
+    (let [nimbus-seeds (set (map #(str %1 ":" (*STORM-CONF* NIMBUS-THRIFT-PORT)) (set (*STORM-CONF* NIMBUS-SEEDS))))
+          alive-nimbuses (set (map #(str (.get_host %1) ":" (.get_port %1)) nimbuses))
+          offline-nimbuses (clojure.set/difference nimbus-seeds alive-nimbuses)
+          offline-nimbuses-summary (map #(convert-to-nimbus-summary %1) offline-nimbuses)]
+      {"nimbuses"
+       (concat offline-nimbuses-summary
+       (for [^NimbusSummary n nimbuses]
+         {
+          "host" (.get_host n)
+          "port" (.get_port n)
+          "nimbusLogLink" (nimbus-log-link (.get_host n) (.get_port n))
+          "status" (if (.is_isLeader n) "Leader" "Not a Leader")
+          "version" (.get_version n)
+          "nimbusUpTime" (pretty-uptime-sec (.get_uptime_secs n))}))})))
 
 (defn supervisor-summary
   ([]
@@ -557,7 +607,8 @@
        "host" (.get_host s)
        "uptime" (pretty-uptime-sec (.get_uptime_secs s))
        "slotsTotal" (.get_num_workers s)
-       "slotsUsed" (.get_num_used_workers s)})}))
+       "slotsUsed" (.get_num_used_workers s)
+       "version" (.get_version s)})}))
 
 (defn all-topologies-summary
   ([]
@@ -714,7 +765,6 @@
         "bolts" (bolt-comp id bolt-comp-summs (.get_errors summ) window include-sys?)
         "configuration" topology-conf
         "visualizationTable" (stream-boxes visualizer-data)
-        "antiForgeryToken" *anti-forgery-token*
         "replicationCount" replication-count}))))
 
 (defn spout-output-stats
@@ -819,7 +869,7 @@
        "encodedComponent" (url-encode (.get_componentId s))
        "stream" (.get_streamId s)
        "executeLatency" (float-str (:execute-latencies stats))
-       "processLatency" (float-str (:execute-latencies stats))
+       "processLatency" (float-str (:process-latencies stats))
        "executed" (nil-to-zero (:executed stats))
        "acked" (nil-to-zero (:acked stats))
        "failed" (nil-to-zero (:failed stats))})))
@@ -907,7 +957,9 @@
 (defnk json-response
   [data callback :serialize-fn to-json :status 200]
      {:status status
-      :headers (merge {"Cache-Control" "no-cache, no-store"}
+      :headers (merge {"Cache-Control" "no-cache, no-store"
+                       "Access-Control-Allow-Origin" "*"
+                       "Access-Control-Allow-Headers" "Content-Type, Access-Control-Allow-Headers, Access-Controler-Allow-Origin, X-Requested-By, X-Csrf-Token, Authorization, X-Requested-With"}
                       (if (not-nil? callback) {"Content-Type" "application/javascript;charset=utf-8"}
                           {"Content-Type" "application/json;charset=utf-8"}))
       :body (if (not-nil? callback)
@@ -944,8 +996,6 @@
        (let [user (.getUserName http-creds-handler servlet-request)]
          (assert-authorized-user servlet-request "getTopology" (topology-config id))
          (json-response (component-page id component (:window m) (check-include-sys? (:sys m)) user) (:callback m))))
-  (GET "/api/v1/token" [ & m]
-       (json-response (format "{\"antiForgeryToken\": \"%s\"}" *anti-forgery-token*) (:callback m) :serialize-fn identity))
   (POST "/api/v1/topology/:id/activate" [:as {:keys [cookies servlet-request]} id & m]
     (thrift/with-configured-nimbus-connection nimbus
     (assert-authorized-user servlet-request "activate" (topology-config id))
@@ -1000,7 +1050,25 @@
         (.killTopologyWithOpts nimbus name options)
         (log-message "Killing topology '" name "' with wait time: " wait-time " secs")))
     (json-response (topology-op-response id "kill") (m "callback")))
-
+  (POST "/api/v1/uploadTopology" [:as {:keys [cookies servlet-request]} id & params]
+        (assert-authorized-user servlet-request "submitTopology")
+        (let [valid-tplg (validate-tplg-submit-params params)
+              valid (valid-tplg :valid)
+              context (ReqContext/context)]
+          (if http-creds-handler (.populateContext http-creds-handler context servlet-request))
+          (if (= valid true)
+            (let [tplg-file-data (params :topologyJar)
+                  tplg-temp-file (tplg-file-data :tempfile)
+                  tplg-file-name (tplg-file-data :filename)
+                  tplg-jar-file (clojure.string/join [(.getParent tplg-temp-file) file-path-separator tplg-file-name])
+                  tplg-config (if (not-nil? (params :topologyConfig)) (from-json (params :topologyConfig)))
+                  principal (if (.isImpersonating context) (.realPrincipal context) (.principal context))
+                  user (if principal (.getName principal) "unknown")]
+              (.renameTo tplg-temp-file (File. tplg-jar-file))
+              (let [ret (run-tplg-submit-cmd tplg-jar-file tplg-config user)]
+                (json-response ret (params "callback"))))
+            (json-response {"status" "failed" "error" (valid-tplg :error)} (params "callback"))
+            )))
   (GET "/" [:as {cookies :cookies}]
        (resp/redirect "/index.html"))
   (route/resources "/")
@@ -1023,15 +1091,11 @@
         (json-response (exception->json ex) ((:query-params request) "callback") :status 500)))))
 
 
-(def csrf-error-response
-  (json-response {"error" "Forbidden action."
-                  "errorMessage" "missing CSRF token."} 403))
-
 (def app
   (handler/site (-> main-routes
                     (wrap-json-params)
+                    (wrap-multipart-params)
                     (wrap-reload '[backtype.storm.ui.core])
-                    (wrap-anti-forgery {:error-response csrf-error-response})
                     catch-errors)))
 
 (defn start-server!
@@ -1040,10 +1104,32 @@
     (let [conf *STORM-CONF*
           header-buffer-size (int (.get conf UI-HEADER-BUFFER-BYTES))
           filters-confs [{:filter-class (conf UI-FILTER)
-                          :filter-params (conf UI-FILTER-PARAMS)}]]
+                          :filter-params (conf UI-FILTER-PARAMS)}]
+          https-port (if (not-nil? (conf UI-HTTPS-PORT)) (conf UI-HTTPS-PORT) 0)
+          https-ks-path (conf UI-HTTPS-KEYSTORE-PATH)
+          https-ks-password (conf UI-HTTPS-KEYSTORE-PASSWORD)
+          https-ks-type (conf UI-HTTPS-KEYSTORE-TYPE)
+          https-key-password (conf UI-HTTPS-KEY-PASSWORD)
+          https-ts-path (conf UI-HTTPS-TRUSTSTORE-PATH)
+          https-ts-password (conf UI-HTTPS-TRUSTSTORE-PASSWORD)
+          https-ts-type (conf UI-HTTPS-TRUSTSTORE-TYPE)
+          https-want-client-auth (conf UI-HTTPS-WANT-CLIENT-AUTH)
+          https-need-client-auth (conf UI-HTTPS-NEED-CLIENT-AUTH)]
       (storm-run-jetty {:port (conf UI-PORT)
                         :host (conf UI-HOST)
+                        :https-port https-port
                         :configurator (fn [server]
+                                        (config-ssl server
+                                                    https-port
+                                                    https-ks-path
+                                                    https-ks-password
+                                                    https-ks-type
+                                                    https-key-password
+                                                    https-ts-path
+                                                    https-ts-password
+                                                    https-ts-type
+                                                    https-need-client-auth
+                                                    https-want-client-auth)
                                         (doseq [connector (.getConnectors server)]
                                           (.setRequestHeaderSize connector header-buffer-size))
                                         (config-filter server app filters-confs))}))
