@@ -311,7 +311,10 @@
                       (condp = subtree
                          ASSIGNMENTS-ROOT (if (empty? args)
                                              (issue-callback! assignments-callback)
-                                             (issue-map-callback! assignment-info-callback (first args)))
+                                             (do
+                                               (issue-map-callback! assignment-info-callback (first args))
+                                               (issue-map-callback! assignment-version-callback (first args))
+                                               (issue-map-callback! assignment-info-with-version-callback (first args))))
                          SUPERVISORS-ROOT (issue-callback! supervisors-callback)
                          CODE-DISTRIBUTOR-ROOT (issue-callback! code-distributor-callback)
                          STORMS-ROOT (issue-map-callback! storm-base-callback (first args))

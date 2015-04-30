@@ -47,9 +47,8 @@ storm.auth.simple-white-list.users: []
 storm.auth.simple-acl.users: []
 storm.auth.simple-acl.users.commands: []
 storm.auth.simple-acl.admins: []
-storm.meta.serialization.delegate: "backtype.storm.serialization.DefaultSerializationDelegate"
+storm.meta.serialization.delegate: "backtype.storm.serialization.GzipThriftSerializationDelegate"
 storm.codedistributor.class: "backtype.storm.codedistributor.LocalFileSystemCodeDistributor"
-storm.meta.serialization.delegate: "backtype.storm.serialization.ThriftSerializationDelegate"
 
 ### nimbus.* configs are for the master
 nimbus.seeds : ["localhost:6627"]
