@@ -18,6 +18,7 @@
 package org.apache.storm.hbase.security;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -42,7 +43,7 @@ public class HBaseSecurityUtil {
 
     public static UserProvider login(Map conf, Configuration hbaseConfig) throws IOException {
         //Allowing keytab based login for backward compatibility.
-        UserProvider provider = UserProvider.instantiate(hbaseConfig);
+        final UserProvider provider = UserProvider.instantiate(hbaseConfig);
         if (conf.get(TOPOLOGY_AUTO_CREDENTIALS) == null ||
                 !(((List) conf.get(TOPOLOGY_AUTO_CREDENTIALS)).contains(AutoHBase.class.getName()))) {
             LOG.info("Logging in using keytab as AutoHBase is not specified for " + TOPOLOGY_AUTO_CREDENTIALS);
@@ -58,6 +59,39 @@ public class HBaseSecurityUtil {
                 provider.login(STORM_KEYTAB_FILE_KEY, STORM_USER_NAME_KEY,
                         InetAddress.getLocalHost().getCanonicalHostName());
             }
+
+            new Thread() {
+                @Override
+                public void run() {
+                    while (true)
+                    {
+                        try {
+                            User.getCurrent().getUGI().checkTGTAndReloginFromKeytab();
+                            LOG.info("Renewed some cred using checkTGTAndReloginFromKeytab method.");
+                            Thread.sleep(5 * 60 * 1000);
+                        } catch (Exception e) {
+                            LOG.error("error in renewing thread using checkTGTAndReloginFromKeytab ", e);
+                        }
+                    }
+                }
+            }.start();
+
+            new Thread() {
+                @Override
+                public void run() {
+                    while (true)
+                    {
+                        try {
+                            provider.login(STORM_KEYTAB_FILE_KEY, STORM_USER_NAME_KEY,
+                                    InetAddress.getLocalHost().getCanonicalHostName());
+                            LOG.info("Renewed some cred using provider.login method.");
+                            Thread.sleep(5 * 60 * 1000);
+                        } catch (Exception e) {
+                            LOG.error("error in renewing thread using provided ", e);
+                        }
+                    }
+                }
+            }.start();
         }
         return provider;
     }
