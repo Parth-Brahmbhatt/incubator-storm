@@ -154,7 +154,7 @@ public class Client extends ConnectionWithStatus implements IStatefulObject {
         this.stormConf = stormConf;
         this.scheduler =  MoreExecutors.listeningDecorator(scheduler);
         int bufferSize = Utils.getInt(stormConf.get(Config.STORM_MESSAGING_NETTY_BUFFER_SIZE));
-        LOG.info("creating Netty Client, connecting to {}:{}, bufferSize: {}", host, port, bufferSize);
+        LOG.info("creating Netty Client, connecting to " + host + ":" + port + " , bufferSize: " + bufferSize);
         messageBatchSize = Utils.getInt(stormConf.get(Config.STORM_NETTY_MESSAGE_BATCH_SIZE), 262144);
         flushCheckIntervalMs = Utils.getInt(stormConf.get(Config.STORM_NETTY_FLUSH_CHECK_INTERVAL_MS), 10);
 
@@ -256,8 +256,7 @@ public class Client extends ConnectionWithStatus implements IStatefulObject {
             connectionAttempts.getAndIncrement();
             if (reconnectingAllowed()) {
                 totalConnectionAttempts.getAndIncrement();
-                LOG.info("connection attempt {} to {} scheduled to run in {} ms", connectionAttempts.get(),
-                    dstAddressPrefixedName, delayMs);
+                LOG.info("connection attempt " + connectionAttempts.get() + " to " + dstAddressPrefixedName + "  scheduled to run in " + delayMs + "  ms");
                 ListenableFuture<Channel> channelFuture = scheduler.schedule(
                     new Connector(dstAddress, connectionAttempts.get()), delayMs, TimeUnit.MILLISECONDS);
                 Futures.addCallback(channelFuture, new FutureCallback<Channel>() {
@@ -474,8 +473,7 @@ public class Client extends ConnectionWithStatus implements IStatefulObject {
                     messagesSent.getAndAdd(batch.size());
                 }
                 else {
-                    LOG.warn("failed to send {} messages to {}: {}", numMessages, dstAddressPrefixedName,
-                        future.getCause());
+                    LOG.warn("failed to send " + numMessages + " messages to " + dstAddressPrefixedName  + " : " + future.getCause());
                     closeChannelAndReconnect(future.getChannel());
                     messagesLost.getAndAdd(numMessages);
                 }
@@ -516,16 +514,14 @@ public class Client extends ConnectionWithStatus implements IStatefulObject {
     }
 
     private synchronized void waitForPendingMessagesToBeSent() {
-        LOG.info("waiting up to {} ms to send {} pending messages to {}",
-            PENDING_MESSAGES_FLUSH_TIMEOUT_MS, pendingMessages.get(), dstAddressPrefixedName);
+        LOG.info("waiting up to" + PENDING_MESSAGES_FLUSH_TIMEOUT_MS + " ms to send " + pendingMessages.get() + " pending messages to dstAddressPrefixedName");
         long totalPendingMsgs = pendingMessages.get();
         long startMs = nowMillis();
         while (pendingMessages.get() != 0) {
             try {
                 long deltaMs = nowMillis() - startMs;
                 if (deltaMs > PENDING_MESSAGES_FLUSH_TIMEOUT_MS) {
-                    LOG.error("failed to send all pending messages to {} within timeout, {} of {} messages were not " +
-                        "sent", dstAddressPrefixedName, pendingMessages.get(), totalPendingMsgs);
+                    LOG.error("failed to send all pending messages to " + dstAddressPrefixedName + " within timeout, "  + pendingMessages.get() + " of " + totalPendingMsgs + "  messages were not sent.");
                     break;
                 }
                 Thread.sleep(PENDING_MESSAGES_FLUSH_INTERVAL_MS);
@@ -602,8 +598,7 @@ public class Client extends ConnectionWithStatus implements IStatefulObject {
 
             if (future.isSuccess() && connectionEstablished(current)) {
                 channel = current;
-                LOG.debug("successfully connected to {}, {} [attempt {}]", address.toString(), channel.toString(),
-                    connectionAttempt);
+                LOG.debug("successfully connected to " + address.toString() +" , " + channel.toString() +" [attempt " + connectionAttempt +  " ]");
             }
             else {
                 LOG.debug("failed to connect to {} [attempt {}]", address.toString(), connectionAttempt);

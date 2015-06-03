@@ -614,7 +614,7 @@
         </repository>
         <repository>
        		<id>hortonworks.repo</id>
-       		<url>http://54.235.92.15/nexus/content/groups/public/</url>
+       		<url>http://nexus-private.hortonworks.com/nexus/content/groups/public/</url>
        		<name>Hortonworks Repo</name>
        		<releases>
           		<enabled>true</enabled>
