@@ -17,8 +17,15 @@
  */
 package org.apache.storm.hbase.topology;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.storm.hbase.bolt.HBaseBolt;
 import org.apache.storm.hbase.bolt.mapper.SimpleHBaseMapper;
+import org.apache.storm.hbase.common.HBaseClient;
 import org.apache.storm.hbase.security.HBaseSecurityUtil;
 
 import backtype.storm.Config;
@@ -38,6 +45,20 @@ public class PersistentWordCount {
 
 
     public static void main(String[] args) throws Exception {
+//        Configuration conf = HBaseConfiguration.create();
+//        HBaseAdmin admin = new HBaseAdmin(conf);
+//
+//        //creating table descriptor
+//        HTableDescriptor table = new HTableDescriptor(TableName.valueOf("WordCount"));
+//
+//        //creating column family descriptor
+//        HColumnDescriptor family = new HColumnDescriptor("cf");
+//
+//        //adding coloumn family to HTable
+//        table.addFamily(family);
+//
+//        admin.createTable(table);
+
         Config config = new Config();
 
         Map<String, Object> hbConf = new HashMap<String, Object>();
@@ -79,8 +100,8 @@ public class PersistentWordCount {
         } else if (args.length == 4) {
             System.out.println("hdfs url: " + args[0] + ", keytab file: " + args[2] + 
                 ", principal name: " + args[3] + ", toplogy name: " + args[1]);
-            hbConf.put(HBaseSecurityUtil.STORM_KEYTAB_FILE_KEY, args[2]);
-            hbConf.put(HBaseSecurityUtil.STORM_USER_NAME_KEY, args[3]);
+            config.put(HBaseSecurityUtil.STORM_KEYTAB_FILE_KEY, args[2]);
+            config.put(HBaseSecurityUtil.STORM_USER_NAME_KEY, args[3]);
             config.setNumWorkers(3);
             StormSubmitter.submitTopology(args[1], config, builder.createTopology());
         } else {
