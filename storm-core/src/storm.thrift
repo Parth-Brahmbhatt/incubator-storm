@@ -135,6 +135,10 @@ exception InvalidTopologyException {
   1: required string msg;
 }
 
+exception ThrottlingException {
+  1: required string msg;
+}
+
 struct TopologySummary {
   1: required string id;
   2: required string name;

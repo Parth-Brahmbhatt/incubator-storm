@@ -17,37 +17,15 @@
  */
 package backtype.storm.utils;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.net.URL;
-import java.net.URLDecoder;
-import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.WritableByteChannel;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
-import java.util.UUID;
-import java.util.zip.GZIPOutputStream;
-import java.util.zip.GZIPInputStream;
-
+import backtype.storm.Config;
+import backtype.storm.generated.*;
 import backtype.storm.serialization.DefaultSerializationDelegate;
 import backtype.storm.serialization.SerializationDelegate;
+import clojure.lang.IFn;
+import clojure.lang.RT;
+import org.apache.commons.lang.StringUtils;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.commons.lang.StringUtils;
 import org.apache.thrift.TException;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
@@ -58,20 +36,20 @@ import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 
-import backtype.storm.Config;
-import backtype.storm.generated.ComponentCommon;
-import backtype.storm.generated.ComponentObject;
-import backtype.storm.generated.StormTopology;
-import backtype.storm.generated.AuthorizationException;
-
-import clojure.lang.IFn;
-import clojure.lang.RT;
+import java.io.*;
+import java.net.URL;
+import java.net.URLDecoder;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.WritableByteChannel;
+import java.util.*;
 
 public class Utils {
     private static final Logger LOG = LoggerFactory.getLogger(Utils.class);
     public static final String DEFAULT_STREAM_ID = "default";
 
     private static SerializationDelegate serializationDelegate;
+    private static Random randomGenerator = new Random();
 
     static {
         Map conf = readStormConfig();
@@ -255,14 +233,35 @@ public class Utils {
         return ret;
     }
 
-    public static void downloadFromMaster(Map conf, String file, String localFile) throws AuthorizationException, IOException, TException {
+    public static void downloadFromMaster(Map conf, String file, String localFile) throws AuthorizationException, IOException, TException, InterruptedException {
         NimbusClient client = NimbusClient.getConfiguredClient(conf);
+        download(client, file, localFile);
+    }
+
+    public static void downloadFromHost(Map conf, String file, String localFile, String host, int port) throws IOException, TException, AuthorizationException, InterruptedException {
+        NimbusClient client = new NimbusClient (conf, host, port, null);
+        download(client, file, localFile);
+    }
+
+    private static void download(NimbusClient client, String file, String localFile) throws IOException, TException, AuthorizationException, InterruptedException {
         String id = client.getClient().beginFileDownload(file);
         WritableByteChannel out = Channels.newChannel(new FileOutputStream(localFile));
+
         while(true) {
-            ByteBuffer chunk = client.getClient().downloadChunk(id);
-            int written = out.write(chunk);
-            if(written==0) break;
+            int sleepMillis = 50 + randomGenerator.nextInt(100);
+            try {
+                ByteBuffer chunk = client.getClient().downloadChunk(id);
+                int written = out.write(chunk);
+                Thread.sleep(sleepMillis);
+                if (written == 0) break;
+            } catch (Exception e) {
+                if(e instanceof ThrottlingException) {
+                    LOG.warn("Nimbus is busy will sleep for  " + sleepMillis + " and retry.", e);
+                    Thread.sleep(sleepMillis);
+                } else {
+                    throw new RuntimeException(e);
+                }
+            }
         }
         out.close();
     }
@@ -370,9 +369,9 @@ public class Utils {
                 .connectionTimeoutMs(Utils.getInt(conf.get(Config.STORM_ZOOKEEPER_CONNECTION_TIMEOUT)))
                 .sessionTimeoutMs(Utils.getInt(conf.get(Config.STORM_ZOOKEEPER_SESSION_TIMEOUT)))
                 .retryPolicy(new StormBoundedExponentialBackoffRetry(
-                            Utils.getInt(conf.get(Config.STORM_ZOOKEEPER_RETRY_INTERVAL)),
-                            Utils.getInt(conf.get(Config.STORM_ZOOKEEPER_RETRY_INTERVAL_CEILING)),
-                            Utils.getInt(conf.get(Config.STORM_ZOOKEEPER_RETRY_TIMES))));
+                        Utils.getInt(conf.get(Config.STORM_ZOOKEEPER_RETRY_INTERVAL)),
+                        Utils.getInt(conf.get(Config.STORM_ZOOKEEPER_RETRY_INTERVAL_CEILING)),
+                        Utils.getInt(conf.get(Config.STORM_ZOOKEEPER_RETRY_TIMES))));
         if(auth!=null && auth.scheme!=null && auth.payload != null) {
             builder = builder.authorization(auth.scheme, auth.payload);
         }
