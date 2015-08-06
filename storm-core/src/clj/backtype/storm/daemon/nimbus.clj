@@ -1184,6 +1184,7 @@
 
       (^ByteBuffer downloadChunk [this ^String id]
         (check-authorization! nimbus nil nil "fileDownload")
+        (sleep-secs 1)
         (let [downloaders (:downloaders nimbus)
               ^BufferFileInputStream is (.get downloaders id)]
           (when-not is
@@ -1325,13 +1326,8 @@
                                                   (.shutdown service-handler)
                                                   (.stop server)))
     (log-message "Starting Nimbus server...")
-    (try
-      (.serve server)
-      service-handler
-    (catch RejectedExecutionException e
-      (log-warn-error e "Nimbus under load, all threads are occupied, throttling Client.
-      If you think this is your normal nimbus load situaiton consider increasing " NIMBUS-THRIFT-THREADS)
-      (throw (ThrottlingException. e))))))
+    (.serve server)
+    service-handler))
 
 ;; distributed implementation
 
