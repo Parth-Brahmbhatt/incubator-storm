@@ -25,6 +25,9 @@ import org.apache.hive.hcatalog.streaming.*;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import backtype.storm.Constants;
+import backtype.storm.tuple.Tuple;
+
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.io.File;
@@ -71,6 +74,12 @@ public class HiveUtils {
              super("Kerberos Authentication Failed. " + reason, cause);
          }
      }
+
+    public static boolean isTick(Tuple tuple) {
+        return tuple != null
+            && Constants.SYSTEM_COMPONENT_ID  .equals(tuple.getSourceComponent())
+            && Constants.SYSTEM_TICK_STREAM_ID.equals(tuple.getSourceStreamId());
+    }
 
 
 }
