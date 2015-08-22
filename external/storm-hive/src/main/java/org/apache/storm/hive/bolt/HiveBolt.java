@@ -56,7 +56,7 @@ public class HiveBolt extends  BaseRichBolt {
     private ExecutorService callTimeoutPool;
     private transient Timer heartBeatTimer;
     private Boolean kerberosEnabled = false;
-    private AtomicBoolean timeToSendHeartBeat = new AtomicBoolean(false);
+    private Boolean sendHeartBeat = true;
     private UserGroupInformation ugi = null;
     HashMap<HiveEndPoint, HiveWriter> allWriters;
     private List<Tuple> tupleBatch;
@@ -105,19 +105,16 @@ public class HiveBolt extends  BaseRichBolt {
             if (HiveUtils.isTick(tuple)) {
                 LOG.debug("TICK received! current batch status [" + tupleBatch.size() + "/" + options.getBatchSize() + "]");
                 forceFlush = true;
-            }
-            else {
+            } else {
                 List<String> partitionVals = options.getMapper().mapPartitions(tuple);
                 HiveEndPoint endPoint = HiveUtils.makeEndPoint(partitionVals, options);
                 HiveWriter writer = getOrCreateWriter(endPoint);
-                if (timeToSendHeartBeat.compareAndSet(true, false)) {
-                    enableHeartBeatOnAllWriters();
-                }
                 writer.write(options.getMapper().mapRecord(tuple));
                 tupleBatch.add(tuple);
                 if (tupleBatch.size() >= options.getBatchSize())
                     forceFlush = true;
             }
+
             if(forceFlush && !tupleBatch.isEmpty()) {
                 flushAllWriters(true);
                 LOG.info("acknowledging tuples after writers flushed ");
@@ -153,6 +150,7 @@ public class HiveBolt extends  BaseRichBolt {
     public void cleanup() {
         for (Entry<HiveEndPoint, HiveWriter> entry : allWriters.entrySet()) {
             try {
+                sendHeartBeat = false;
                 HiveWriter w = entry.getValue();
                 LOG.info("Flushing writer to {}", w);
                 w.flush(false);
@@ -201,10 +199,23 @@ public class HiveBolt extends  BaseRichBolt {
             heartBeatTimer.schedule(new TimerTask() {
                     @Override
                     public void run() {
-                        timeToSendHeartBeat.set(true);
-                        setupHeartBeatTimer();
+                        try {
+                            if (sendHeartBeat) {
+                                LOG.debug("Start sending heartbeat on all writers");
+                                sendHeartBeatOnAllWriters();
+                                setupHeartBeatTimer();
+                            }
+                        } catch (Exception e) {
+                            LOG.warn("Failed to heartbeat on HiveWriter ", e);
+                        }
                     }
-                }, options.getHeartBeatInterval() * 1000);
+                }, options.getHeartBeatInterval());
+        }
+    }
+
+    private void sendHeartBeatOnAllWriters() throws InterruptedException {
+        for (HiveWriter writer : allWriters.values()) {
+            writer.heartBeat();
         }
     }
 
@@ -243,11 +254,6 @@ public class HiveBolt extends  BaseRichBolt {
         }
     }
 
-    private void enableHeartBeatOnAllWriters() {
-        for (HiveWriter writer : allWriters.values()) {
-            writer.setHeartBeatNeeded();
-        }
-    }
 
     private HiveWriter getOrCreateWriter(HiveEndPoint endPoint)
         throws HiveWriter.ConnectFailure, InterruptedException {

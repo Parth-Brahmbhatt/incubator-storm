@@ -49,11 +49,10 @@ public class HiveWriter {
     private TransactionBatch txnBatch;
     private final ExecutorService callTimeoutPool;
     private final long callTimeout;
-
+    private final Object txnBatchLock = new Object();
     private long lastUsed; // time of last flush on this writer
     protected boolean closed; // flag indicating HiveWriter was closed
     private boolean autoCreatePartitions;
-    private boolean heartBeatNeeded = false;
     private UserGroupInformation ugi;
 
     public HiveWriter(HiveEndPoint endPoint, int txnsPerBatch,
@@ -84,10 +83,6 @@ public class HiveWriter {
     @Override
     public String toString() {
         return endPoint.toString();
-    }
-
-    public void setHeartBeatNeeded() {
-        heartBeatNeeded = true;
     }
 
     /**
@@ -127,23 +122,20 @@ public class HiveWriter {
      */
     public void flush(boolean rollToNext)
         throws CommitFailure, TxnBatchFailure, TxnFailure, InterruptedException {
-        if(heartBeatNeeded) {
-            heartBeatNeeded = false;
-            heartBeat();
-        }
         lastUsed = System.currentTimeMillis();
         try {
-            commitTxn();
-            if(txnBatch.remainingTransactions() == 0) {
-                closeTxnBatch();
-                txnBatch = null;
-                if(rollToNext) {
-                    txnBatch = nextTxnBatch(recordWriter);
+            synchronized(txnBatchLock) {
+                commitTxn();
+                if(txnBatch.remainingTransactions() == 0) {
+                    closeTxnBatch();
+                    txnBatch = null;
+                    if(rollToNext) {
+                        txnBatch = nextTxnBatch(recordWriter);
+                    }
+                } else if(rollToNext) {
+                    LOG.debug("Switching to next Txn for {}", endPoint);
+                    txnBatch.beginNextTransaction(); // does not block
                 }
-            }
-            if(rollToNext) {
-                LOG.debug("Switching to next Txn for {}", endPoint);
-                txnBatch.beginNextTransaction(); // does not block
             }
         } catch(StreamingException e) {
             throw new TxnFailure(txnBatch, e);
@@ -158,10 +150,12 @@ public class HiveWriter {
         try {
             callWithTimeout(new CallRunner<Void>() {
                     @Override
-                        public Void call() throws Exception {
+                    public Void call() throws Exception {
                         try {
-                            LOG.debug("Sending heartbeat on batch " + txnBatch);
-                            txnBatch.heartbeat();
+                            synchronized(txnBatchLock) {
+                                LOG.info("Sending heartbeat on batch " + txnBatch);
+                                txnBatch.heartbeat();
+                            }
                         } catch (StreamingException e) {
                             LOG.warn("Heartbeat error on batch " + txnBatch, e);
                         }

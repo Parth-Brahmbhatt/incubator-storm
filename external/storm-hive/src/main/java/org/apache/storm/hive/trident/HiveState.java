@@ -55,6 +55,7 @@ public class HiveState implements State {
     private ExecutorService callTimeoutPool;
     private transient Timer heartBeatTimer;
     private AtomicBoolean timeToSendHeartBeat = new AtomicBoolean(false);
+    private Boolean sendHeartBeat = true;
     private UserGroupInformation ugi = null;
     private Boolean kerberosEnabled = false;
     HashMap<HiveEndPoint, HiveWriter> allWriters;
@@ -116,9 +117,6 @@ public class HiveState implements State {
 
     private void writeTuples(List<TridentTuple> tuples)
         throws Exception {
-        if(timeToSendHeartBeat.compareAndSet(true, false)) {
-            enableHeartBeatOnAllWriters();
-        }
         for (TridentTuple tuple : tuples) {
             List<String> partitionVals = options.getMapper().mapPartitions(tuple);
             HiveEndPoint endPoint = HiveUtils.makeEndPoint(partitionVals, options);
@@ -134,6 +132,7 @@ public class HiveState implements State {
 
     private void abortAndCloseWriters() {
         try {
+            sendHeartBeat = false;
             abortAllWriters();
             closeAllWriters();
         } catch(InterruptedException e) {
@@ -172,10 +171,17 @@ public class HiveState implements State {
             heartBeatTimer.schedule(new TimerTask() {
                     @Override
                     public void run() {
-                        timeToSendHeartBeat.set(true);
-                        setupHeartBeatTimer();
+                        try {
+                            if (sendHeartBeat) {
+                                LOG.debug("Start sending heartbeat on all writers");
+                                sendHeartBeatOnAllWriters();
+                                setupHeartBeatTimer();
+                            }
+                        } catch (Exception e) {
+                            LOG.warn("Failed to heartbeat on HiveWriter ", e);
+                        }
                     }
-                }, options.getHeartBeatInterval() * 1000);
+                }, options.getHeartBeatInterval());
         }
     }
 
@@ -186,9 +192,9 @@ public class HiveState implements State {
         }
     }
 
-    private void enableHeartBeatOnAllWriters() {
+    private void sendHeartBeatOnAllWriters() throws InterruptedException {
         for (HiveWriter writer : allWriters.values()) {
-            writer.setHeartBeatNeeded();
+            writer.heartBeat();
         }
     }
 
@@ -274,6 +280,7 @@ public class HiveState implements State {
     public void cleanup() {
         for (Entry<HiveEndPoint, HiveWriter> entry : allWriters.entrySet()) {
             try {
+                sendHeartBeat = false;
                 HiveWriter w = entry.getValue();
                 LOG.info("Flushing writer to {}", w);
                 w.flush(false);
