@@ -181,7 +181,7 @@ public class HiveState implements State {
                             LOG.warn("Failed to heartbeat on HiveWriter ", e);
                         }
                     }
-                }, options.getHeartBeatInterval());
+                }, options.getHeartBeatInterval() * 1000);
         }
     }
 

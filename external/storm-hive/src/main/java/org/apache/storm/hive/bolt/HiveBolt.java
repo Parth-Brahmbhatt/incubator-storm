@@ -209,7 +209,7 @@ public class HiveBolt extends  BaseRichBolt {
                             LOG.warn("Failed to heartbeat on HiveWriter ", e);
                         }
                     }
-                }, options.getHeartBeatInterval());
+                }, options.getHeartBeatInterval() * 1000);
         }
     }
 
