@@ -147,26 +147,26 @@ public class HiveWriter {
      */
     public void heartBeat() throws InterruptedException {
         // 1) schedule the heartbeat on one thread in pool
-        try {
-            callWithTimeout(new CallRunner<Void>() {
-                    @Override
-                    public Void call() throws Exception {
-                        try {
-                            synchronized(txnBatchLock) {
+        synchronized(txnBatchLock) {
+            try {
+                callWithTimeout(new CallRunner<Void>() {
+                        @Override
+                        public Void call() throws Exception {
+                            try {
                                 LOG.info("Sending heartbeat on batch " + txnBatch);
                                 txnBatch.heartbeat();
+                            } catch (StreamingException e) {
+                                LOG.warn("Heartbeat error on batch " + txnBatch, e);
                             }
-                        } catch (StreamingException e) {
-                            LOG.warn("Heartbeat error on batch " + txnBatch, e);
+                            return null;
                         }
-                        return null;
-                    }
-                });
-        } catch (InterruptedException e) {
-            throw e;
-        } catch (Exception e) {
-            LOG.warn("Unable to send heartbeat on Txn Batch " + txnBatch, e);
-            // Suppressing exceptions as we don't care for errors on heartbeats
+                    });
+            } catch (InterruptedException e) {
+                throw e;
+            } catch (Exception e) {
+                LOG.warn("Unable to send heartbeat on Txn Batch " + txnBatch,  e);
+                // Suppressing exceptions as we don't care for errors on heartbeats
+            }
         }
     }
 
