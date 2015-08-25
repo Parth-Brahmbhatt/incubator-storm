@@ -133,7 +133,7 @@ public class HiveWriter {
                         txnBatch = nextTxnBatch(recordWriter);
                     }
                 } else if(rollToNext) {
-                    LOG.debug("Switching to next Txn for {}", endPoint);
+                    LOG.info("Switching to next Txn for {}", endPoint);
                     txnBatch.beginNextTransaction(); // does not block
                 }
             }
@@ -198,7 +198,7 @@ public class HiveWriter {
     }
 
     private void commitTxn() throws CommitFailure, InterruptedException {
-        LOG.debug("Committing Txn id {} to {}", txnBatch.getCurrentTxnId() , endPoint);
+        LOG.info("Committing Txn id {} to {}", txnBatch.getCurrentTxnId() , endPoint);
         try {
             callWithTimeout(new CallRunner<Void>() {
                     @Override
@@ -232,7 +232,7 @@ public class HiveWriter {
 
     private TransactionBatch nextTxnBatch(final RecordWriter recordWriter)
         throws InterruptedException, TxnBatchFailure {
-        LOG.debug("Fetching new Txn Batch for {}", endPoint);
+        LOG.info("Fetching new Txn Batch for {}", endPoint);
         TransactionBatch batch = null;
         try {
             batch = callWithTimeout(new CallRunner<TransactionBatch>() {
@@ -241,8 +241,9 @@ public class HiveWriter {
                     return connection.fetchTransactionBatch(txnsPerBatch, recordWriter); // could block
                 }
             });
-        LOG.debug("Acquired {}. Switching to first txn", batch);
+
         batch.beginNextTransaction();
+        LOG.info("Acquired {}. Switching to first txn", batch);
         } catch(TimeoutException e) {
             throw new TxnBatchFailure(endPoint, e);
         } catch(StreamingException e) {
@@ -253,7 +254,7 @@ public class HiveWriter {
 
     private void closeTxnBatch() throws  InterruptedException {
         try {
-            LOG.debug("Closing Txn Batch {}", txnBatch);
+            LOG.info("Closing Txn Batch {}", txnBatch);
             callWithTimeout(new CallRunner<Void>() {
                     @Override
                         public Void call() throws Exception {
