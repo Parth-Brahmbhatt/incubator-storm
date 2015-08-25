@@ -23,7 +23,6 @@ import backtype.storm.task.TopologyContext;
 import backtype.storm.tuple.Tuple;
 import backtype.storm.topology.base.BaseRichBolt;
 import backtype.storm.topology.OutputFieldsDeclarer;
-import backtype.storm.utils.TupleUtils;
 import backtype.storm.Config;
 import org.apache.storm.hive.common.HiveWriter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -219,7 +218,7 @@ public class HiveBolt extends  BaseRichBolt {
         }
     }
 
-    private void flushAllWriters(boolean rollToNext)
+    void flushAllWriters(boolean rollToNext)
         throws HiveWriter.CommitFailure, HiveWriter.TxnBatchFailure, HiveWriter.TxnFailure, InterruptedException {
         for(HiveWriter writer: allWriters.values()) {
             writer.flush(rollToNext);
