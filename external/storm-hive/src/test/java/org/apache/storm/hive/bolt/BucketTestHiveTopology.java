@@ -47,10 +47,19 @@ public class BucketTestHiveTopology {
     static final String TOPOLOGY_NAME = "hive-test-topology1";
 
     public static void main(String[] args) throws Exception {
+        if ((args == null) || (args.length < 6)) {
+            System.out.println("Usage: BucketTestHiveTopology metastoreURI "
+                    + "dbName tableName dataFileLocation hiveBatchSize " +
+                    "hiveTickTupl]eIntervalSecs  [topologyNamey] [keytab file]"
+                    + " [principal name] ");
+            System.exit(1);
+        }
         String metaStoreURI = args[0];
         String dbName = args[1];
         String tblName = args[2];
         String sourceFileLocation = args[3];
+        Integer hiveBatchSize = Integer.parseInt(args[4]);
+        Integer hiveTickTupleIntervalSecs = Integer.parseInt(args[5]);
         String[] colNames = { "s_store_sk", "s_store_id", "s_rec_start_date",
                 "s_rec_end_date", "s_closed_date_sk", "s_store_name",
                 "s_number_employees", "s_floor_space", "s_hours",
@@ -66,26 +75,25 @@ public class BucketTestHiveTopology {
         DelimitedRecordHiveMapper mapper = new DelimitedRecordHiveMapper()
                 .withColumnFields(new Fields(colNames)).withTimeAsPartitionField("YYYY/MM/DD");
         HiveOptions hiveOptions;
-        if (args.length == 7) {
-            hiveOptions = new HiveOptions(metaStoreURI,dbName,tblName,mapper)
-                    .withTxnsPerBatch(10)
-                    .withBatchSize(1)
-                    .withIdleTimeout(10)
-                    .withKerberosKeytab(args[5])
-                    .withKerberosPrincipal(args[6]);
-        } else {
-            hiveOptions = new HiveOptions(metaStoreURI,dbName,tblName,mapper)
-                    .withTxnsPerBatch(10)
-                    .withBatchSize(1)
-                    .withIdleTimeout(10);
+        hiveOptions = new HiveOptions(metaStoreURI,dbName,tblName,mapper)
+                .withTxnsPerBatch(10)
+                .withBatchSize(hiveBatchSize)
+                .withIdleTimeout(10);
+        // doing below because its affecting storm metrics most likely
+        // had to make tick tuple a mandatory argument since its positional
+        if (hiveTickTupleIntervalSecs > 0) {
+            hiveOptions.withTickTupleInterval(hiveTickTupleIntervalSecs);
+        }
+        if (args.length == 9) {
+            hiveOptions.withKerberosKeytab(args[7]).withKerberosPrincipal(args[8]);
         }
         HiveBolt hiveBolt = new HiveBolt(hiveOptions);
         TopologyBuilder builder = new TopologyBuilder();
         builder.setSpout(USER_SPOUT_ID, spout, 1);
         // SentenceSpout --> MyBolt
-        builder.setBolt(BOLT_ID, hiveBolt, 1)
+        builder.setBolt(BOLT_ID, hiveBolt, 14)
                 .shuffleGrouping(USER_SPOUT_ID);
-        if (args.length == 4) {
+        if (args.length == 6) {
             LocalCluster cluster = new LocalCluster();
             cluster.submitTopology(TOPOLOGY_NAME, config, builder.createTopology());
             waitForSeconds(20);
@@ -94,12 +102,8 @@ public class BucketTestHiveTopology {
             cluster.shutdown();
             System.out.println("cluster shutdown");
             System.exit(0);
-        } else if(args.length >= 4) {
-            StormSubmitter.submitTopology(args[4], config, builder.createTopology());
         } else {
-            System.out.println("Usage: HiveTopology metastoreURI dbName " +
-                    "tableName dataFileLocation [topologyNamey] [keytab file]" +
-                    " [principal name]");
+            StormSubmitter.submitTopology(args[6], config, builder.createTopology());
         }
     }
 
