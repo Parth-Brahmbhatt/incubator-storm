@@ -36,6 +36,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -60,15 +61,14 @@ public class BucketTestHiveTopology {
         String sourceFileLocation = args[3];
         Integer hiveBatchSize = Integer.parseInt(args[4]);
         Integer hiveTickTupleIntervalSecs = Integer.parseInt(args[5]);
-        String[] colNames = { "s_store_sk", "s_store_id", "s_rec_start_date",
-                "s_rec_end_date", "s_closed_date_sk", "s_store_name",
-                "s_number_employees", "s_floor_space", "s_hours",
-                "s_manager", "s_market_id", "s_geography_class",
-                "s_market_desc", "s_market_manager", "s_division_id",
-                "s_division_name", "s_company_id", "s_company_name",
-                "s_street_number", "s_street_name", "s_street_type",
-                "s_suite_number", "s_city", "s_county", "s_state", "s_zip",
-                "s_country", "s_gmt_offset", "s_tax_precentage"};
+        String[] colNames = { "ss_sold_date_sk", "ss_sold_time_sk", "ss_item_sk",
+                "ss_customer_sk", "ss_cdemo_sk", "ss_hdemo_sk", "ss_addr_sk",
+                "ss_store_sk", "ss_promo_sk", "ss_ticket_number", "ss_quantity",
+                "ss_wholesale_cost", "ss_list_price", "ss_sales_price",
+                "ss_ext_discount_amt", "ss_ext_sales_price",
+                "ss_ext_wholesale_cost", "ss_ext_list_price", "ss_ext_tax",
+                "ss_coupon_amt", "ss_net_paid", "ss_net_paid_inc_tax",
+                "ss_net_profit" };
         Config config = new Config();
         config.setNumWorkers(1);
         UserDataSpout spout = new UserDataSpout().withDataFile(sourceFileLocation);
@@ -121,6 +121,14 @@ public class BucketTestHiveTopology {
         private BufferedReader br;
         private int count = 0;
         private long total = 0L;
+        private String[] outputFields = { "ss_sold_date_sk", "ss_sold_time_sk",
+                "ss_item_sk", "ss_customer_sk", "ss_cdemo_sk", "ss_hdemo_sk",
+                "ss_addr_sk", "ss_store_sk", "ss_promo_sk", "ss_ticket_number",
+                "ss_quantity", "ss_wholesale_cost", "ss_list_price",
+                "ss_sales_price", "ss_ext_discount_amt", "ss_ext_sales_price",
+                "ss_ext_wholesale_cost", "ss_ext_list_price", "ss_ext_tax",
+                "ss_coupon_amt", "ss_net_paid", "ss_net_paid_inc_tax",
+                "ss_net_profit" };
 
         public UserDataSpout withDataFile (String filePath) {
             this.filePath = filePath;
@@ -128,15 +136,7 @@ public class BucketTestHiveTopology {
         }
 
         public void declareOutputFields(OutputFieldsDeclarer declarer) {
-            declarer.declare(new Fields("s_store_sk", "s_store_id", "s_rec_start_date",
-                "s_rec_end_date", "s_closed_date_sk", "s_store_name",
-                "s_number_employees", "s_floor_space", "s_hours",
-                "s_manager", "s_market_id", "s_geography_class",
-                "s_market_desc", "s_market_manager", "s_division_id",
-                "s_division_name", "s_company_id", "s_company_name",
-                "s_street_number", "s_street_name", "s_street_type",
-                "s_suite_number", "s_city", "s_county", "s_state", "s_zip",
-                "s_country", "s_gmt_offset", "s_tax_precentage"));
+            declarer.declare(new Fields(this.outputFields));
         }
 
         public void open(Map config, TopologyContext context,
@@ -156,7 +156,11 @@ public class BucketTestHiveTopology {
             try {
                 if ((line = br.readLine()) != null) {
                     System.out.println("*********" + line);
-                    String[] values = line.split("\\|");
+                    String[] values = line.split("\\|", -1);
+                    // above gives an extra empty string at the end. below
+                    // removes that
+                    values = Arrays.copyOfRange(values, 0,
+                            this.outputFields.length);
                     Values tupleValues = new Values(values);
                     UUID msgId = UUID.randomUUID();
                     this.pending.put(msgId, tupleValues);
