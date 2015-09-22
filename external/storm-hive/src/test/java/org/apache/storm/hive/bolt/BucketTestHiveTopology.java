@@ -70,7 +70,7 @@ public class BucketTestHiveTopology {
                 "ss_coupon_amt", "ss_net_paid", "ss_net_paid_inc_tax",
                 "ss_net_profit" };
         Config config = new Config();
-        config.setNumWorkers(1);
+        config.setNumWorkers(5);
         UserDataSpout spout = new UserDataSpout().withDataFile(sourceFileLocation);
         DelimitedRecordHiveMapper mapper = new DelimitedRecordHiveMapper()
                 .withColumnFields(new Fields(colNames)).withTimeAsPartitionField("YYYY/MM/DD");
