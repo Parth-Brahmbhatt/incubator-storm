@@ -209,6 +209,13 @@
                            (get-in
                              (spout-streams-stats spout-summs true)
                              [:complete-latencies window]))
+                :throughput (if bolt-summs
+                              (get-in
+                                (bolt-streams-stats bolt-summs true)
+                                [:throughput window])
+                              (get-in
+                                (spout-streams-stats spout-summs true)
+                                [:throughput window]))
                 :transferred (or
                                (get-in
                                  (spout-streams-stats spout-summs true)
@@ -420,6 +427,7 @@
        "emitted" (get-in stats [:emitted w])
        "transferred" (get-in stats [:transferred w])
        "completeLatency" (float-str (get-in stats [:complete-latencies w]))
+       "throughput" (float-str (get-in stats [:throughput w]))
        "acked" (get-in stats [:acked w])
        "failed" (get-in stats [:failed w])})))
 
@@ -465,6 +473,7 @@
    "tasks" (.get_num_tasks common-stats)
    "emitted" (.get_emitted common-stats)
    "transferred" (.get_transferred common-stats)
+   "throughput" (float-str (.get_throughput common-stats))
    "acked" (.get_acked common-stats)
    "failed" (.get_failed common-stats)})
 
@@ -505,6 +514,7 @@
         stat->window->number
           {:emitted (.get_window_to_emitted topo-stats)
            :transferred (.get_window_to_transferred topo-stats)
+           :throughput (.get_window_to_throughput topo-stats)
            :complete-latencies (.get_window_to_complete_latencies_ms topo-stats)
            :acked (.get_window_to_acked topo-stats)
            :failed (.get_window_to_failed topo-stats)}
@@ -583,6 +593,7 @@
      "windowPretty" (window-hint window)
      "emitted" (.get_emitted comm-s)
      "transferred" (.get_transferred comm-s)
+     "throughput" (float-str (.get_throughput comm-s))
      "acked" (.get_acked comm-s)
      "failed" (.get_failed comm-s)
      "executeLatency" (float-str (.get_execute_latency_ms bolt-s))
@@ -599,6 +610,7 @@
      "windowPretty" (window-hint window)
      "emitted" (.get_emitted comm-s)
      "transferred" (.get_transferred comm-s)
+     "throughput" (float-str (.get_throughput comm-s))
      "acked" (.get_acked comm-s)
      "failed" (.get_failed comm-s)
      "completeLatency" (float-str (.get_complete_latency_ms spout-s))}))
@@ -626,7 +638,8 @@
   (let [^CommonAggregateStats cas (.get_common_stats stats)]
     {"stream" stream-id
      "emitted" (nil-to-zero (.get_emitted cas))
-     "transferred" (nil-to-zero (.get_transferred cas))}))
+     "transferred" (nil-to-zero (.get_transferred cas))
+     "throughput" (float-str (.get_throughput cas))}))
 
 (defmethod unpack-comp-output-stat ComponentType/SPOUT
   [[stream-id ^ComponentAggregateStats stats]]
@@ -636,6 +649,7 @@
     {"stream" stream-id
      "emitted" (nil-to-zero (.get_emitted cas))
      "transferred" (nil-to-zero (.get_transferred cas))
+     "throughput" (float-str (.get_throughput cas))
      "completeLatency" (float-str (.get_complete_latency_ms spout-s))
      "acked" (nil-to-zero (.get_acked cas))
      "failed" (nil-to-zero (.get_failed cas))}))
@@ -663,6 +677,7 @@
      "port" port
      "emitted" (nil-to-zero (.get_emitted cas))
      "transferred" (nil-to-zero (.get_transferred cas))
+     "throughput" (float-str (.get_throughput cas))
      "capacity" (float-str (nil-to-zero (.get_capacity bas)))
      "executeLatency" (float-str (.get_execute_latency_ms bas))
      "executed" (nil-to-zero (.get_executed bas))
@@ -691,6 +706,7 @@
      "port" port
      "emitted" (nil-to-zero (.get_emitted cas))
      "transferred" (nil-to-zero (.get_transferred cas))
+     "throughput" (float-str (.get_throughput cas))
      "completeLatency" (float-str (.get_complete_latency_ms sas))
      "acked" (nil-to-zero (.get_acked cas))
      "failed" (nil-to-zero (.get_failed cas))

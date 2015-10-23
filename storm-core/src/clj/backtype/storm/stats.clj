@@ -277,15 +277,35 @@
          (value-stats stats SPOUT-FIELDS)
          {:type :spout}))
 
+(defn update-values [m f & args]
+  (into {} (for [[k v] m] [k (apply f v args)])))
+
+(defn values-divided-by [kv-pairs t]
+  (update-values kv-pairs / (double t)))
+
+(defn convert-count-to-throughput
+  [stat eclipsed-time-in-secs]
+  (into {} (for [[time buckets] stat]
+             [time (values-divided-by buckets (if (= time :all-time) eclipsed-time-in-secs (min time eclipsed-time-in-secs)))])))
+
+(defn remove-component-id [buckets]
+  (into {} (for [[time pair] buckets]
+             {time (into {} (for [[[component stream] v] pair]
+                              {stream v}))})))
+
 (defmulti render-stats! class-selector)
 
 (defmethod render-stats! SpoutExecutorStats
-  [stats]
-  (value-spout-stats! stats))
+  [stats start-time-in-secs]
+  (let [stats (value-spout-stats! stats)
+        eclipsed-time-in-secs (- (current-time-secs) start-time-in-secs)]
+    (assoc stats :throughput (convert-count-to-throughput (:emitted stats) eclipsed-time-in-secs))))
 
 (defmethod render-stats! BoltExecutorStats
-  [stats]
-  (value-bolt-stats! stats))
+  [stats start-time-in-secs]
+  (let [stats (value-bolt-stats! stats)
+        eclipsed-time-in-secs (- (current-time-secs) start-time-in-secs)]
+    (assoc stats :throughput (remove-component-id (convert-count-to-throughput (:executed stats) eclipsed-time-in-secs)))))
 
 (defmulti thriftify-specific-stats :type)
 (defmulti clojurify-specific-stats class-selector)
@@ -334,8 +354,8 @@
       ; worker heart beat does not store the BoltExecutorStats or SpoutExecutorStats , instead it stores the result returned by render-stats!
       ; which flattens the BoltExecutorStats/SpoutExecutorStats by extracting values from all atoms and merging all values inside :common to top
       ;level map we are pretty much doing the same here.
-      (dissoc (merge common-stats {:type :bolt}  (apply ->BoltExecutorStats (into [nil] specific-stats))) :common)
-      (dissoc (merge common-stats {:type :spout} (apply ->SpoutExecutorStats (into [nil] specific-stats))) :common)
+      (dissoc (merge common-stats {:type :bolt} {:throughput (.get_throughput stats)} (apply ->BoltExecutorStats (into [nil] specific-stats))) :common)
+      (dissoc (merge common-stats {:type :spout} {:throughput (.get_throughput stats)} (apply ->SpoutExecutorStats (into [nil] specific-stats))) :common)
       )))
 
 (defmethod thriftify-specific-stats :bolt
@@ -358,11 +378,13 @@
 (defn thriftify-executor-stats
   [stats]
   (let [specific-stats (thriftify-specific-stats stats)
-        rate (:rate stats)]
-    (ExecutorStats. (window-set-converter (:emitted stats) str)
-      (window-set-converter (:transferred stats) str)
-      specific-stats
-      rate)))
+        rate (:rate stats)
+        executor-stats (ExecutorStats. (window-set-converter (:emitted stats) str)
+                         (window-set-converter (:transferred stats) str)
+                         specific-stats
+                         rate)]
+    (.set_throughput executor-stats(window-set-converter (:throughput stats) str))
+    executor-stats))
 
 (defn- agg-bolt-lat-and-count
   "Aggregates number executed, process latency, and execute latency across all
@@ -528,7 +550,12 @@
                          :transferred
                          str-key
                          (get window)
-                         handle-sys-components-fn)})}))
+                         handle-sys-components-fn)
+        :throughput (-> statk->w->sid->num
+                        :throughput
+                        str-key
+                        (get window)
+                        handle-sys-components-fn)})}))
 
 (defn agg-pre-merge-comp-page-spout
   [{exec-id :exec-id
@@ -577,7 +604,12 @@
                            :transferred
                            str-key
                            (get window)
-                           handle-sys-components-fn)}))}))
+                           handle-sys-components-fn)
+          :throughput (-> statk->w->sid->num
+                          :throughput
+                          str-key
+                          (get window)
+                          handle-sys-components-fn)}))}))
 
 (defn agg-pre-merge-topo-page-bolt
   [{comp-id :comp-id
@@ -618,6 +650,13 @@
                          handle-sys-components-fn
                          vals
                          sum)
+        :throughput (-> statk->w->sid->num
+                        :throughput
+                        str-key
+                        (get window)
+                        handle-sys-components-fn
+                        vals
+                        sum)
         :capacity (compute-agg-capacity statk->w->sid->num uptime)
         :acked (-> statk->w->sid->num
                    :acked
@@ -666,6 +705,13 @@
                          handle-sys-components-fn
                          vals
                          sum)
+        :throughput (-> statk->w->sid->num
+                      :throughput
+                      str-key
+                      (get window)
+                      handle-sys-components-fn
+                      vals
+                      sum)
         :failed (-> statk->w->sid->num
                     :failed
                     str-key
@@ -713,6 +759,7 @@
                           [:executor-id :uptime :host :port :capacity])
              {:emitted (sum-streams bolt-out :emitted)
               :transferred (sum-streams bolt-out :transferred)
+              :throughput (sum-streams bolt-out :throughput)
               :acked (sum-streams bolt-in :acked)
               :failed (sum-streams bolt-in :failed)
               :executed executed}
@@ -742,6 +789,7 @@
              (select-keys spout-stats [:executor-id :uptime :host :port])
              {:emitted (sum-streams spout-out :emitted)
               :transferred (sum-streams spout-out :transferred)
+              :throughput (sum-streams spout-out :throughput)
               :acked acked
               :failed (sum-streams spout-out :failed)}
              {:complete-latency (if (and acked (pos? acked))
@@ -757,6 +805,8 @@
    :emitted (sum-or-0 (:emitted acc-bolt-stats) (:emitted bolt-stats))
    :transferred (sum-or-0 (:transferred acc-bolt-stats)
                           (:transferred bolt-stats))
+   :throughput (sum-or-0 (:throughput acc-bolt-stats)
+                         (:throughput bolt-stats))
    :capacity (max-or-0 (:capacity acc-bolt-stats) (:capacity bolt-stats))
    ;; We sum average latency totals here to avoid dividing at each step.
    ;; Compute the average latencies by dividing the total by the count.
@@ -774,6 +824,7 @@
    :num-tasks (sum-or-0 (:num-tasks acc-spout-stats) (:num-tasks spout-stats))
    :emitted (sum-or-0 (:emitted acc-spout-stats) (:emitted spout-stats))
    :transferred (sum-or-0 (:transferred acc-spout-stats) (:transferred spout-stats))
+   :throughput (sum-or-0 (:throughput acc-spout-stats) (:throughput spout-stats))
    ;; We sum average latency totals here to avoid dividing at each step.
    ;; Compute the average latencies by dividing the total by the count.
    :completeLatencyTotal (sum-or-0 (:completeLatencyTotal acc-spout-stats)
@@ -796,6 +847,7 @@
            spout-id->stats
            window->emitted
            window->transferred
+           window->throughput
            window->comp-lat-wgt-avg
            window->acked
            window->failed] :as acc-stats}
@@ -828,6 +880,10 @@
                                       (map-val handle-sys-components-fn)
                                       aggregate-count-streams
                                       (merge-with + window->transferred))
+            :window->throughput (->> (:throughput stats)
+                                   (map-val handle-sys-components-fn)
+                                   aggregate-count-streams
+                                   (merge-with + window->throughput))
             :window->comp-lat-wgt-avg (merge-with +
                                                   window->comp-lat-wgt-avg
                                                   w->compLatWgtAvg)
@@ -918,6 +974,7 @@
                   :spout-id->stats {}
                   :window->emitted {}
                   :window->transferred {}
+                  :window->throughput {}
                   :window->comp-lat-wgt-avg {}
                   :window->acked {}
                   :window->failed {}}
@@ -968,6 +1025,7 @@
                             (assoc :lastError (last-err-fn id)))]))
    :window->emitted (map-key str (:window->emitted acc-data))
    :window->transferred (map-key str (:window->transferred acc-data))
+   :throughput (map-key str (:window->throughput acc-data))
    :window->complete-latency
      (compute-weighted-averages-per-window acc-data
                                            :window->comp-lat-wgt-avg
@@ -980,6 +1038,7 @@
    {:keys [num-tasks
            emitted
            transferred
+           throughput
            acked
            failed
            num-executors] :as statk->num}]
@@ -988,6 +1047,7 @@
     (and num-tasks (.set_num_tasks cas num-tasks))
     (and emitted (.set_emitted cas emitted))
     (and transferred (.set_transferred cas transferred))
+    (and throughput (.set_throughput cas throughput))
     (and acked (.set_acked cas acked))
     (and failed (.set_failed cas failed))
     (.set_common_stats s cas)))
@@ -1037,6 +1097,7 @@
                 bolt-id->stats
                 window->emitted
                 window->transferred
+                window->throughput
                 window->complete-latency
                 window->acked
                 window->failed]} data
@@ -1053,6 +1114,7 @@
         topology-stats (doto (TopologyStats.)
                          (.set_window_to_emitted window->emitted)
                          (.set_window_to_transferred window->transferred)
+                         (.set_window_to_throughput window->throughput)
                          (.set_window_to_complete_latencies_ms
                            window->complete-latency)
                          (.set_window_to_acked window->acked)
@@ -1108,6 +1170,10 @@
                                (map-val handle-sys-components-fn)
                                aggregate-count-streams
                                (merge-with + (:window->transferred acc-stats)))
+     :window->throughput (->> (:throughput new-stats)
+                              (map-val handle-sys-components-fn)
+                              aggregate-count-streams
+                              (merge-with + (:window->throughput acc-stats)))
      :window->exec-lat-wgt-avg (merge-with +
                                            (:window->exec-lat-wgt-avg acc-stats)
                                            w->execLatWgtAvg)
@@ -1137,6 +1203,10 @@
                            (map-val handle-sys-components-fn)
                            aggregate-count-streams
                            (merge-with + (:window->emitted acc-stats)))
+     :window->throughput (->> (:throughput new-stats)
+                              (map-val handle-sys-components-fn)
+                              aggregate-count-streams
+                              (merge-with + (:window->throughput acc-stats)))
      :window->transferred (->> (:transferred new-stats)
                                (map-val handle-sys-components-fn)
                                aggregate-count-streams
@@ -1190,6 +1260,7 @@
                   :executor-stats []
                   :window->emitted {}
                   :window->transferred {}
+                  :window->throughput {}
                   :window->exec-lat-wgt-avg {}
                   :window->executed {}
                   :window->proc-lat-wgt-avg {}
@@ -1203,6 +1274,7 @@
                   :sid->output-stats {}
                   :executor-stats []
                   :window->emitted {}
+                  :window->throughput {}
                   :window->transferred {}
                   :window->comp-lat-wgt-avg {}
                   :window->acked {}
@@ -1244,6 +1316,7 @@
    :executor-stats (:executor-stats (:stats acc-data))
    :window->emitted (map-key str (:window->emitted acc-data))
    :window->transferred (map-key str (:window->transferred acc-data))
+   :window->throughput (map-key str (:window->throughput acc-data))
    :window->execute-latency
      (compute-weighted-averages-per-window acc-data
                                            :window->exec-lat-wgt-avg
@@ -1278,6 +1351,7 @@
    :executor-stats (:executor-stats (:stats acc-data))
    :window->emitted (map-key str (:window->emitted acc-data))
    :window->transferred (map-key str (:window->transferred acc-data))
+   :window->throughput (map-key str (:window->throughput acc-data))
    :window->complete-latency
      (compute-weighted-averages-per-window acc-data
                                            :window->comp-lat-wgt-avg
@@ -1320,6 +1394,7 @@
                    (merge
                      {:emitted (:window->emitted data)
                       :transferred (:window->transferred data)
+                      :throughput (:window->throughput data)
                       :acked (:window->acked data)
                       :failed (:window->failed data)}
                      (condp = (:type data)
@@ -1429,6 +1504,9 @@
         transferred (:transferred stream-summary)
         transferred (into {} (for [[window stat] transferred]
                                {window (filter-key filter-fn stat)}))
+        throughput (:throughput stream-summary)
+        throughput (into {} (for [[window stat] throughput]
+                              {window (filter-key filter-fn stat)}))
         stream-summary (-> stream-summary (dissoc :emitted) (assoc :emitted emitted))
         stream-summary (-> stream-summary (dissoc :transferred) (assoc :transferred transferred))]
     stream-summary))
@@ -1444,7 +1522,8 @@
 (defn aggregate-common-stats
   [stats-seq]
   {:emitted (aggregate-counts (map #(.get_emitted ^ExecutorStats %) stats-seq))
-   :transferred (aggregate-counts (map #(.get_transferred ^ExecutorStats %) stats-seq))})
+   :transferred (aggregate-counts (map #(.get_transferred ^ExecutorStats %) stats-seq))
+   :throughput (aggregate-counts (map #(.get_throughput ^ExecutorStats %) stats-seq))})
 
 (defn aggregate-bolt-stats
   [stats-seq include-sys?]
@@ -1498,6 +1577,7 @@
    :failed (aggregate-count-streams (:failed stats))
    :emitted (aggregate-count-streams (:emitted stats))
    :transferred (aggregate-count-streams (:transferred stats))
+   :throughput (aggregate-count-streams (:throughput stats))
    :complete-latencies (aggregate-avg-streams (:complete-latencies stats)
                                               (:acked stats))})
 
@@ -1514,6 +1594,7 @@
    :failed (aggregate-count-streams (:failed stats))
    :emitted (aggregate-count-streams (:emitted stats))
    :transferred (aggregate-count-streams (:transferred stats))
+   :throughput (aggregate-count-streams (:throughput stats))
    :process-latencies (aggregate-avg-streams (:process-latencies stats)
                                              (:acked stats))
    :executed (aggregate-count-streams (:executed stats))
@@ -1561,7 +1642,7 @@
         ;; Include only keys that will be used.  We want to count acked and
         ;; failed only for the "tuple trees," so we do not include those keys
         ;; from the bolt executors.
-        [:emitted :transferred])
+        [:emitted :transferred :throughput])
       agg-spout-stats)))
 
 (defn error-subset
