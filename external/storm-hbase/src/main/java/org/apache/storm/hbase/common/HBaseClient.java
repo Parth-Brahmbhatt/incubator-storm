@@ -31,20 +31,61 @@ import java.security.PrivilegedExceptionAction;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.BufferedMutator;
+import org.apache.hadoop.hbase.client.BufferedMutatorParams;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.RetriesExhaustedWithDetailsException;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 public class HBaseClient {
     private static final Logger LOG = LoggerFactory.getLogger(HBaseClient.class);
 
     private HTable table;
 
+    private String tableName;
+
+    private Configuration configuration;
+
+    final BufferedMutator.ExceptionListener listener = new BufferedMutator.ExceptionListener() {
+        @Override
+        public void onException(RetriesExhaustedWithDetailsException e, BufferedMutator mutator) {
+            for (int i = 0; i < e.getNumExceptions(); i++) {
+                LOG.info("Failed to sent put " + e.getRow(i) + ".");
+            }
+        }
+    };
+
     public HBaseClient(Map<String, Object> map , final Configuration configuration, final String tableName) {
         try {
             UserProvider provider = HBaseSecurityUtil.login(map, configuration);
-            this.table = provider.getCurrent().getUGI().doAs(new PrivilegedExceptionAction<HTable>() {
-                @Override
-                public HTable run() throws IOException {
-                    return new HTable(configuration, tableName);
-                }
-            });
+
+            this.tableName = tableName;
+
+//            this.table = provider.getCurrent().getUGI().doAs(new PrivilegedExceptionAction<HTable>() {
+//                @Override
+//                public HTable run() throws IOException {
+//                    return new HTable(configuration, tableName);
+//                }
+//            });
         } catch(Exception e) {
             throw new RuntimeException("HBase bolt preparation failed: " + e.getMessage(), e);
         }
@@ -55,7 +96,7 @@ public class HBaseClient {
 
         if (cols.hasColumns()) {
             Put put = new Put(rowKey);
-            put.setDurability(durability);
+            //put.setDurability(durability);
             for (ColumnList.Column col : cols.getColumns()) {
                 if (col.getTs() > 0) {
                     put.add(
@@ -91,19 +132,20 @@ public class HBaseClient {
         if (mutations.isEmpty()) {
             mutations.add(new Put(rowKey));
         }
+
         return mutations;
     }
 
     public void batchMutate(List<Mutation> mutations) throws Exception {
-        Object[] result = new Object[mutations.size()];
-        try {
-            table.batch(mutations, result);
-        } catch (InterruptedException e) {
-            LOG.warn("Error performing a mutation to HBase.", e);
-            throw e;
-        } catch (IOException e) {
-            LOG.warn("Error performing a mutation to HBase.", e);
-            throw e;
+        BufferedMutatorParams params = new BufferedMutatorParams(TableName.valueOf(tableName))
+                .listener(listener);
+        try (Connection connection = ConnectionFactory.createConnection(configuration);
+             final BufferedMutator mutator = connection.getBufferedMutator(params)) {
+            for (Mutation message : mutations) {
+                mutator.mutate(message);
+            }
+        } catch (IOException ex) {
+            LOG.warn("Error performing a mutation to HBase.", ex);
         }
     }
 
