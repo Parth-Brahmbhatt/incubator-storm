@@ -93,7 +93,7 @@ public class HBaseBolt  extends AbstractHBaseBolt {
     @Override
     public void execute(Tuple tuple) {
         boolean flush = false;
-        collector.ack(tuple);
+        //collector.ack(tuple);
         try {
             if (TupleUtils.isTick(tuple)) {
                 LOG.debug("TICK received! current batch status [" + tupleBatch.size() + "/" + batchSize + "]");
@@ -113,7 +113,7 @@ public class HBaseBolt  extends AbstractHBaseBolt {
                 this.hBaseClient.batchMutate(batchMutations);
                 LOG.debug("acknowledging tuples after batchMutate");
                 for(Tuple t : tupleBatch) {
-                    //collector.ack(t);
+                    collector.ack(t);
                 }
                 tupleBatch.clear();
                 batchMutations.clear();
