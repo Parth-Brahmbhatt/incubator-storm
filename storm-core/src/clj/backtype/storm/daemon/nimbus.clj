@@ -90,6 +90,13 @@
   [(first ZooDefs$Ids/CREATOR_ALL_ACL) 
    (ACL. (bit-or ZooDefs$Perms/READ ZooDefs$Perms/CREATE) ZooDefs$Ids/ANYONE_ID_UNSAFE)])
 
+(defn create-tology-action-notifier [conf]
+  (when-not (clojure.string/blank? (conf NIMBUS-TOPOLOGY-ACTION-NOTIFIER-PLUGIN))
+    (let [instance (new-instance (conf NIMBUS-TOPOLOGY-ACTION-NOTIFIER-PLUGIN))]
+      (.prepare instance conf)
+      instance
+      )))
+
 (defn nimbus-data [conf inimbus]
   (let [forced-scheduler (.getForcedScheduler inimbus)]
     {:conf conf
@@ -119,8 +126,7 @@
      :id->sched-status (atom {})
      :cred-renewers (AuthUtils/GetCredentialRenewers conf)
      :nimbus-autocred-plugins (AuthUtils/getNimbusAutoCredPlugins conf)
-     :nimbus-topology-action-notifier (when-not (clojure.string/blank? (conf NIMBUS-TOPOLOGY-ACTION-NOTIFIER-PLUGIN))
-                                        (new-instance (conf NIMBUS-TOPOLOGY-ACTION-NOTIFIER-PLUGIN)))
+     :nimbus-topology-action-notifier (create-tology-action-notifier conf)
      }))
 
 (defn inbox [nimbus]
@@ -786,7 +792,9 @@
 (defn notify-topology-action-listener [nimbus storm-id action]
   (let [topology-action-notifier (:nimbus-topology-action-notifier nimbus)]
     (when (not-nil? topology-action-notifier)
-      (.notify topology-action-notifier storm-id action))))
+      (try (.notify topology-action-notifier storm-id action)
+        (catch Exception e
+        (log-warn-error e "Ignoring exception from Topology action notifier for storm-Id " storm-id))))))
 
 (defn- start-storm [nimbus storm-name storm-id topology-initial-status]
   {:pre [(#{:active :inactive} topology-initial-status)]}
@@ -806,7 +814,7 @@
                                   (storm-conf TOPOLOGY-SUBMITTER-USER)
                                   nil
                                   nil))
-    (notify-topology-action-listener nimbus storm-id "activate")))
+    (notify-topology-action-listener nimbus storm-name "activate")))
 
 ;; Master:
 ;; job submit:
@@ -1472,6 +1480,7 @@
         (.cleanup (:uploaders nimbus))
         (.close (:leader-elector nimbus))
         (if (:code-distributor nimbus) (.close (:code-distributor nimbus) (:conf nimbus)))
+        (when (:nimbus-topology-action-notifier nimbus) (.cleanup (:nimbus-topology-action-notifier nimbus)))
         (log-message "Shut down master")
         )
       DaemonCommon
