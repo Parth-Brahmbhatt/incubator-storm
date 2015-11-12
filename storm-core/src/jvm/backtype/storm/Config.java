@@ -166,7 +166,7 @@ public class Config extends HashMap<String, Object> {
     public static final String STORM_LOG4J2_CONF_DIR = "storm.log4j2.conf.dir";
 
     /**
-     * A global task scheduler used to assign topologies's tasks to supervisors' wokers.
+     * A global task scheduler used to assign topologies's tasks to supervisors' workers.
      *
      * If this is not set, a default system scheduler will be used.
      */
@@ -192,7 +192,7 @@ public class Config extends HashMap<String, Object> {
      * The hostname the supervisors/workers should report to nimbus. If unset, Storm will
      * get the hostname to report by calling <code>InetAddress.getLocalHost().getCanonicalHostName()</code>.
      *
-     * You should set this config when you dont have a DNS which supervisors/workers
+     * You should set this config when you don't have a DNS which supervisors/workers
      * can utilize to find each other based on hostname got from calls to
      * <code>InetAddress.getLocalHost().getCanonicalHostName()</code>.
      */
@@ -336,6 +336,19 @@ public class Config extends HashMap<String, Object> {
     public static final String STORM_ID = "storm.id";
 
     /**
+     * The directory where storm's health scripts go.
+     */
+    @isString
+    public static final String STORM_HEALTH_CHECK_DIR = "storm.health.check.dir";
+
+    /**
+     * The time to allow any given healthcheck script to run before it
+     * is marked failed due to timeout
+     */
+    @isNumber
+    public static final String STORM_HEALTH_CHECK_TIMEOUT_MS = "storm.health.check.timeout.ms";
+
+    /**
      * The number of times to retry a Nimbus operation.
      */
     @isNumber
@@ -445,7 +458,7 @@ public class Config extends HashMap<String, Object> {
      * How often nimbus should wake up to check heartbeats and do reassignments. Note
      * that if a machine ever goes down Nimbus will immediately wake up and take action.
      * This parameter is for checking for failures when there's no explicit event like that
-     * occuring.
+     * occurring.
      */
     @isInteger
     @isPositiveNumber
@@ -453,7 +466,7 @@ public class Config extends HashMap<String, Object> {
 
     /**
      * How often nimbus should wake the cleanup thread to clean the inbox.
-     * @see NIMBUS_INBOX_JAR_EXPIRATION_SECS
+     * @see #NIMBUS_INBOX_JAR_EXPIRATION_SECS
      */
     @isInteger
     @isPositiveNumber
@@ -466,7 +479,7 @@ public class Config extends HashMap<String, Object> {
      * Note that the time it takes to delete an inbox jar file is going to be somewhat more than
      * NIMBUS_CLEANUP_INBOX_JAR_EXPIRATION_SECS (depending on how often NIMBUS_CLEANUP_FREQ_SECS
      * is set to).
-     * @see NIMBUS_CLEANUP_FREQ_SECS
+     * @see #NIMBUS_CLEANUP_INBOX_FREQ_SECS
      */
     @isInteger
     public static final String NIMBUS_INBOX_JAR_EXPIRATION_SECS = "nimbus.inbox.jar.expiration.secs";
@@ -634,7 +647,7 @@ public class Config extends HashMap<String, Object> {
     public static final String LOGVIEWER_HTTPS_KEYSTORE_TYPE = "logviewer.https.keystore.type";
 
     /**
-     * Password to the private key in the keystore for settting up HTTPS (SSL).
+     * Password to the private key in the keystore for setting up HTTPS (SSL).
      */
     @isString
     public static final String LOGVIEWER_HTTPS_KEY_PASSWORD = "logviewer.https.key.password";
@@ -659,7 +672,7 @@ public class Config extends HashMap<String, Object> {
     public static final String LOGVIEWER_HTTPS_TRUSTSTORE_TYPE = "logviewer.https.truststore.type";
 
     /**
-     * Password to the truststore used by Storm Logviewer settting up HTTPS (SSL).
+     * Password to the truststore used by Storm Logviewer setting up HTTPS (SSL).
      */
     @isBoolean
     public static final String LOGVIEWER_HTTPS_WANT_CLIENT_AUTH = "logviewer.https.want.client.auth";
@@ -737,19 +750,19 @@ public class Config extends HashMap<String, Object> {
     public static final String UI_HTTPS_KEYSTORE_TYPE = "ui.https.keystore.type";
 
     /**
-     * Password to the private key in the keystore for settting up HTTPS (SSL).
+     * Password to the private key in the keystore for setting up HTTPS (SSL).
      */
     @isString
     public static final String UI_HTTPS_KEY_PASSWORD = "ui.https.key.password";
 
     /**
-     * Path to the truststore used by Storm UI settting up HTTPS (SSL).
+     * Path to the truststore used by Storm UI setting up HTTPS (SSL).
      */
     @isString
     public static final String UI_HTTPS_TRUSTSTORE_PATH = "ui.https.truststore.path";
 
     /**
-     * Password to the truststore used by Storm UI settting up HTTPS (SSL).
+     * Password to the truststore used by Storm UI setting up HTTPS (SSL).
      */
     @isString
     public static final String UI_HTTPS_TRUSTSTORE_PASSWORD = "ui.https.truststore.password";
@@ -762,7 +775,7 @@ public class Config extends HashMap<String, Object> {
     public static final String UI_HTTPS_TRUSTSTORE_TYPE = "ui.https.truststore.type";
 
     /**
-     * Password to the truststore used by Storm DRPC settting up HTTPS (SSL).
+     * Password to the truststore used by Storm DRPC setting up HTTPS (SSL).
      */
     @isBoolean
     public static final String UI_HTTPS_WANT_CLIENT_AUTH = "ui.https.want.client.auth";
@@ -808,19 +821,19 @@ public class Config extends HashMap<String, Object> {
     public static final String DRPC_HTTPS_KEYSTORE_TYPE = "drpc.https.keystore.type";
 
     /**
-     * Password to the private key in the keystore for settting up HTTPS (SSL).
+     * Password to the private key in the keystore for setting up HTTPS (SSL).
      */
     @isString
     public static final String DRPC_HTTPS_KEY_PASSWORD = "drpc.https.key.password";
 
     /**
-     * Path to the truststore used by Storm DRPC settting up HTTPS (SSL).
+     * Path to the truststore used by Storm DRPC setting up HTTPS (SSL).
      */
     @isString
     public static final String DRPC_HTTPS_TRUSTSTORE_PATH = "drpc.https.truststore.path";
 
     /**
-     * Password to the truststore used by Storm DRPC settting up HTTPS (SSL).
+     * Password to the truststore used by Storm DRPC setting up HTTPS (SSL).
      */
     @isString
     public static final String DRPC_HTTPS_TRUSTSTORE_PASSWORD = "drpc.https.truststore.password";
@@ -833,7 +846,7 @@ public class Config extends HashMap<String, Object> {
     public static final String DRPC_HTTPS_TRUSTSTORE_TYPE = "drpc.https.truststore.type";
 
     /**
-     * Password to the truststore used by Storm DRPC settting up HTTPS (SSL).
+     * Password to the truststore used by Storm DRPC setting up HTTPS (SSL).
      */
     @isBoolean
     public static final String DRPC_HTTPS_WANT_CLIENT_AUTH = "drpc.https.want.client.auth";
@@ -862,14 +875,14 @@ public class Config extends HashMap<String, Object> {
 
     /**
      * The Access Control List for the DRPC Authorizer.
-     * @see DRPCSimpleAclAuthorizer
+     * @see backtype.storm.security.auth.authorizer.DRPCSimpleACLAuthorizer
      */
     @isType(type=Map.class)
     public static final String DRPC_AUTHORIZER_ACL = "drpc.authorizer.acl";
 
     /**
      * File name of the DRPC Authorizer ACL.
-     * @see DRPCSimpleAclAuthorizer
+     * @see backtype.storm.security.auth.authorizer.DRPCSimpleACLAuthorizer
      */
     @isString
     public static final String DRPC_AUTHORIZER_ACL_FILENAME = "drpc.authorizer.acl.filename";
@@ -881,7 +894,7 @@ public class Config extends HashMap<String, Object> {
      * permitted, which is appropriate for a development environment. When set
      * to true, explicit ACL entries are required for every DRPC function, and
      * any request for functions will be denied.
-     * @see DRPCSimpleAclAuthorizer
+     * @see backtype.storm.security.auth.authorizer.DRPCSimpleACLAuthorizer
      */
     @isBoolean
     public static final String DRPC_AUTHORIZER_ACL_STRICT = "drpc.authorizer.acl.strict";
@@ -1133,13 +1146,6 @@ public class Config extends HashMap<String, Object> {
      */
     @isStringOrStringList
     public static final String WORKER_GC_CHILDOPTS = "worker.gc.childopts";
-
-    /**
-     * control how many worker receiver threads we need per worker
-     */
-    @isInteger
-    @isPositiveNumber
-    public static final String WORKER_RECEIVER_THREAD_COUNT = "topology.worker.receiver.thread.count";
 
     /**
      * How often this worker should heartbeat to the supervisor.

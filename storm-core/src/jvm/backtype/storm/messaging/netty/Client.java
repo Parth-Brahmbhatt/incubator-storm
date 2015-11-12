@@ -32,6 +32,7 @@ import backtype.storm.Config;
 import backtype.storm.grouping.Load;
 import backtype.storm.messaging.ConnectionWithStatus;
 import backtype.storm.messaging.TaskMessage;
+import backtype.storm.messaging.IConnectionCallback;
 import backtype.storm.metric.api.IStatefulObject;
 import backtype.storm.utils.StormBoundedExponentialBackoffRetry;
 import backtype.storm.utils.Utils;
@@ -84,7 +85,7 @@ public class Client extends ConnectionWithStatus implements IStatefulObject, ISa
     /**
      * The channel used for all write operations from this client to the remote destination.
      */
-    private final AtomicReference<Channel> channelRef = new AtomicReference<Channel>();
+    private final AtomicReference<Channel> channelRef = new AtomicReference<>();
 
     /**
      * Total number of connection attempts.
@@ -217,7 +218,7 @@ public class Client extends ConnectionWithStatus implements IStatefulObject, ISa
      * @throws java.lang.UnsupportedOperationException whenever this method is being called.
      */
     @Override
-    public Iterator<TaskMessage> recv(int flags, int clientId) {
+    public void registerRecv(IConnectionCallback cb) {
         throw new UnsupportedOperationException("Client connection should not receive any messages");
     }
 
