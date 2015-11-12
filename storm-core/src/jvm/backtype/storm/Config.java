@@ -501,6 +501,19 @@ public class Config extends HashMap<String, Object> {
     public static final Object NIMBUS_AUTO_CRED_PLUGINS_SCHEMA = ConfigValidation.StringsValidator;
 
     /**
+     * FQCN of a class that implements {@code ISubmitterHook} @see ISubmitterHook for details.
+     */
+
+    public static final String STORM_TOPOLOGY_SUBMISSION_NOTIFIER_PLUGIN = "storm.topology.submission.notifier.plugin.class";
+    public static final Object STORM_TOPOLOGY_SUBMISSION_NOTIFIER_PLUGIN_SCHEMA = String.class;
+
+    /**
+     * FQCN of a class that implements {@code I} @see backtype.storm.nimbus.ITopologyActionNotifierPlugin for details.
+     */
+    public static final String NIMBUS_TOPOLOGY_ACTION_NOTIFIER_PLUGIN = "nimbus.topology.action.notifier.plugin.class";
+    public static final Object NIMBUS_TOPOLOGY_ACTION_NOTIFIER_PLUGIN_SCHEMA = String.class;
+
+    /**
      * Storm UI binds to this host/interface.
      */
     public static final String UI_HOST = "ui.host";
