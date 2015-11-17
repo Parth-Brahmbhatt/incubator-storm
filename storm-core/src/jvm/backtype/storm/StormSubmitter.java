@@ -117,7 +117,7 @@ public class StormSubmitter {
         conf.putAll(stormConf);
         Map<String,String> fullCreds = populateCredentials(conf, credentials);
         if (fullCreds.isEmpty()) {
-            LOG.warn("No credentials were found to push to "+name);
+            LOG.warn("No credentials were found to push to " + name);
             return;
         }
         try {
@@ -248,6 +248,19 @@ public class StormSubmitter {
             LOG.info("Finished submitting topology: " +  name);
         } catch(TException e) {
             throw new RuntimeException(e);
+        }
+
+        try {
+            invokeSubmitterHook(name, conf, topology);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static void invokeSubmitterHook(String name, Map stormConf, StormTopology topology) throws Exception {
+        if(stormConf.containsKey(Config.STORM_TOPOLOGY_SUBMISSION_NOTIFIER_PLUGIN)) {
+            ISubmitterHook submitterHook = (ISubmitterHook) Class.forName(stormConf.get(Config.STORM_TOPOLOGY_SUBMISSION_NOTIFIER_PLUGIN).toString()).newInstance();
+            submitterHook.notify(name, stormConf, topology);
         }
     }
 
