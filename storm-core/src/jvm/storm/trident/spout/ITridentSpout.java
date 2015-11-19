@@ -24,9 +24,8 @@ import java.io.Serializable;
 import java.util.Map;
 import storm.trident.operation.TridentCollector;
 
-
-public interface ITridentSpout<T> extends Serializable {
-    public interface BatchCoordinator<X> {
+public interface ITridentSpout<T> extends ITridentDataSource {
+    interface BatchCoordinator<X> {
         /**
          * Create metadata for this particular transaction id which has never
          * been emitted before. The metadata should contain whatever is necessary
