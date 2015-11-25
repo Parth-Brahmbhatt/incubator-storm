@@ -249,18 +249,18 @@ public class StormSubmitter {
         } catch(TException e) {
             throw new RuntimeException(e);
         }
+        invokeSubmitterHook(name, conf, topology);
 
-        try {
-            invokeSubmitterHook(name, conf, topology);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 
-    private static void invokeSubmitterHook(String name, Map stormConf, StormTopology topology) throws Exception {
-        if(stormConf.containsKey(Config.STORM_TOPOLOGY_SUBMISSION_NOTIFIER_PLUGIN)) {
-            ISubmitterHook submitterHook = (ISubmitterHook) Class.forName(stormConf.get(Config.STORM_TOPOLOGY_SUBMISSION_NOTIFIER_PLUGIN).toString()).newInstance();
-            submitterHook.notify(name, stormConf, topology);
+    private static void invokeSubmitterHook(String name, Map stormConf, StormTopology topology) {
+        try {
+            if (stormConf.containsKey(Config.STORM_TOPOLOGY_SUBMISSION_NOTIFIER_PLUGIN)) {
+                ISubmitterHook submitterHook = (ISubmitterHook) Class.forName(stormConf.get(Config.STORM_TOPOLOGY_SUBMISSION_NOTIFIER_PLUGIN).toString()).newInstance();
+                submitterHook.notify(name, stormConf, topology);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 

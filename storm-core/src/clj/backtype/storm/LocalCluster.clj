@@ -15,7 +15,7 @@
 ;; limitations under the License.
 
 (ns backtype.storm.LocalCluster
-  (:use [backtype.storm testing config])
+  (:use [backtype.storm testing config util])
   (:import [java.util Map])
   (:gen-class
     :init init
@@ -40,7 +40,9 @@
 (defn -submitTopology
   [this name conf topology]
   (submit-local-topology
-    (:nimbus (. this state)) name conf topology))
+    (:nimbus (. this state)) name conf topology)
+  (let [hook (get-configured-class conf STORM-TOPOLOGY-SUBMISSION-NOTIFIER-PLUGIN)]
+    (when hook (.notify hook name conf topology))))
 
 (defn -submitTopologyWithOpts
   [this name conf topology submit-opts]
