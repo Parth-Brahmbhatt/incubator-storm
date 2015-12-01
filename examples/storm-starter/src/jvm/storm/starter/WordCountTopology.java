@@ -18,6 +18,7 @@
 package storm.starter;
 
 import backtype.storm.Config;
+import backtype.storm.HookTest;
 import backtype.storm.LocalCluster;
 import backtype.storm.StormSubmitter;
 import backtype.storm.task.ShellBolt;
@@ -95,6 +96,7 @@ public class WordCountTopology {
     }
     else {
       conf.setMaxTaskParallelism(3);
+      conf.put(Config.STORM_TOPOLOGY_SUBMISSION_NOTIFIER_PLUGIN, HookTest.class.getName());
 
       LocalCluster cluster = new LocalCluster();
       cluster.submitTopology("word-count", conf, builder.createTopology());
