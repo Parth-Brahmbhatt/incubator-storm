@@ -297,13 +297,8 @@
 
       (submit-local-topology nimbus "tester1" {TOPOLOGY-WORKERS 6} topology)
       (submit-local-topology nimbus "tester2" {TOPOLOGY-WORKERS 6} topology)
-<<<<<<< HEAD
-      (advance-cluster-time cluster 1)
-    
-=======
       (advance-cluster-time cluster 11)
 
->>>>>>> ea2c2d2... Added prepare and clenanup, passing topology name instead of Id and added test.
       (bind task-info-tester1 (storm-component->task-info cluster "tester1"))
       (bind task-info-tester2 (storm-component->task-info cluster "tester2"))
 
@@ -597,13 +592,8 @@
       (bind [executor-id1 executor-id2]  (topology-executors cluster storm-id))
       (bind ass1 (executor-assignment cluster storm-id executor-id1))
       (bind ass2 (executor-assignment cluster storm-id executor-id2))
-<<<<<<< HEAD
-      
-      (advance-cluster-time cluster 59)
-=======
 
-      (advance-cluster-time cluster 30)
->>>>>>> ea2c2d2... Added prepare and clenanup, passing topology name instead of Id and added test.
+      (advance-cluster-time cluster 59)
       (do-executor-heartbeat cluster storm-id executor-id1)
       (do-executor-heartbeat cluster storm-id executor-id2)
 
