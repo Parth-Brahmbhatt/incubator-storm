@@ -153,6 +153,7 @@ struct TopologySummary {
 524: optional double assigned_memonheap;
 525: optional double assigned_memoffheap;
 526: optional double assigned_cpu;
+527: optional i32 version = 0;
 }
 
 struct SupervisorSummary {
@@ -254,6 +255,7 @@ struct TopologyInfo {
 524: optional double assigned_memonheap;
 525: optional double assigned_memoffheap;
 526: optional double assigned_cpu;
+527: optional i32 version = 0;
 }
 
 struct CommonAggregateStats {
@@ -323,6 +325,7 @@ struct TopologyPageInfo {
 524: optional double assigned_memonheap;
 525: optional double assigned_memoffheap;
 526: optional double assigned_cpu;
+527: optional i32 version = 0;
 }
 
 struct ExecutorAggregateStats {
@@ -349,6 +352,10 @@ struct ComponentPageInfo {
 }
 
 struct KillOptions {
+  1: optional i32 wait_secs;
+}
+
+struct UpdateActionOptions {
   1: optional i32 wait_secs;
 }
 
@@ -405,12 +412,14 @@ enum TopologyStatus {
     ACTIVE = 1,
     INACTIVE = 2,
     REBALANCING = 3,
-    KILLED = 4
+    KILLED = 4,
+    UPDATING = 5
 }
 
 union TopologyActionOptions {
     1: optional KillOptions kill_options;
     2: optional RebalanceOptions rebalance_options;
+    3: optional UpdateActionOptions update_options;
 }
 
 struct StormBase {
@@ -423,6 +432,7 @@ struct StormBase {
     7: optional TopologyActionOptions topology_action_options;
     8: optional TopologyStatus prev_status;//currently only used during rebalance action.
     9: optional map<string, DebugOptions> component_debug; // topology/component level debug option.
+    10: optional i32 version = 0;
 }
 
 struct ClusterWorkerHeartbeat {
@@ -538,9 +548,17 @@ struct TopologyHistoryInfo {
   1: list<string> topo_ids;
 }
 
+struct UpdateOptions {
+  1: optional string uploadedJarLocation;
+  2: optional string jsonConf;
+  3: optional StormTopology topology;
+  4: optional i32 wait_secs;
+}
+
 service Nimbus {
   void submitTopology(1: string name, 2: string uploadedJarLocation, 3: string jsonConf, 4: StormTopology topology) throws (1: AlreadyAliveException e, 2: InvalidTopologyException ite, 3: AuthorizationException aze);
   void submitTopologyWithOpts(1: string name, 2: string uploadedJarLocation, 3: string jsonConf, 4: StormTopology topology, 5: SubmitOptions options) throws (1: AlreadyAliveException e, 2: InvalidTopologyException ite, 3: AuthorizationException aze);
+  void updateTopology(1: string name, 2: UpdateOptions options) throws (1: NotAliveException nae, 2: InvalidTopologyException ite, 3: AuthorizationException aze);
   void killTopology(1: string name) throws (1: NotAliveException e, 2: AuthorizationException aze);
   void killTopologyWithOpts(1: string name, 2: KillOptions options) throws (1: NotAliveException e, 2: AuthorizationException aze);
   void activate(1: string name) throws (1: NotAliveException e, 2: AuthorizationException aze);
@@ -637,6 +655,19 @@ enum HBServerMessageType {
   NOT_AUTHORIZED
 }
 
+struct HBPulse {
+  1: required string id;
+  2: binary details;
+}
+
+struct HBRecords {
+  1: list<HBPulse> pulses;
+}
+
+struct HBNodes {
+  1: list<string> pulseIds;
+}
+
 union HBMessageData {
   1: string path,
   2: HBPulse pulse,
@@ -659,17 +690,4 @@ exception HBAuthorizationException {
 
 exception HBExecutionException {
   1: required string msg;
-}
-
-struct HBPulse {
-  1: required string id;
-  2: binary details;
-}
-
-struct HBRecords {
-  1: list<HBPulse> pulses;
-}
-
-struct HBNodes {
-  1: list<string> pulseIds;
 }

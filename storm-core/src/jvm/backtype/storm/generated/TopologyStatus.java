@@ -32,7 +32,8 @@ public enum TopologyStatus implements org.apache.thrift.TEnum {
   ACTIVE(1),
   INACTIVE(2),
   REBALANCING(3),
-  KILLED(4);
+  KILLED(4),
+  UPDATING(5);
 
   private final int value;
 
@@ -61,6 +62,8 @@ public enum TopologyStatus implements org.apache.thrift.TEnum {
         return REBALANCING;
       case 4:
         return KILLED;
+      case 5:
+        return UPDATING;
       default:
         return null;
     }

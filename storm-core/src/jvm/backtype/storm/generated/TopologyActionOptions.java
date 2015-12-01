@@ -55,11 +55,13 @@ public class TopologyActionOptions extends org.apache.thrift.TUnion<TopologyActi
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("TopologyActionOptions");
   private static final org.apache.thrift.protocol.TField KILL_OPTIONS_FIELD_DESC = new org.apache.thrift.protocol.TField("kill_options", org.apache.thrift.protocol.TType.STRUCT, (short)1);
   private static final org.apache.thrift.protocol.TField REBALANCE_OPTIONS_FIELD_DESC = new org.apache.thrift.protocol.TField("rebalance_options", org.apache.thrift.protocol.TType.STRUCT, (short)2);
+  private static final org.apache.thrift.protocol.TField UPDATE_OPTIONS_FIELD_DESC = new org.apache.thrift.protocol.TField("update_options", org.apache.thrift.protocol.TType.STRUCT, (short)3);
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
     KILL_OPTIONS((short)1, "kill_options"),
-    REBALANCE_OPTIONS((short)2, "rebalance_options");
+    REBALANCE_OPTIONS((short)2, "rebalance_options"),
+    UPDATE_OPTIONS((short)3, "update_options");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -78,6 +80,8 @@ public class TopologyActionOptions extends org.apache.thrift.TUnion<TopologyActi
           return KILL_OPTIONS;
         case 2: // REBALANCE_OPTIONS
           return REBALANCE_OPTIONS;
+        case 3: // UPDATE_OPTIONS
+          return UPDATE_OPTIONS;
         default:
           return null;
       }
@@ -124,6 +128,8 @@ public class TopologyActionOptions extends org.apache.thrift.TUnion<TopologyActi
         new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, KillOptions.class)));
     tmpMap.put(_Fields.REBALANCE_OPTIONS, new org.apache.thrift.meta_data.FieldMetaData("rebalance_options", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, RebalanceOptions.class)));
+    tmpMap.put(_Fields.UPDATE_OPTIONS, new org.apache.thrift.meta_data.FieldMetaData("update_options", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, UpdateActionOptions.class)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(TopologyActionOptions.class, metaDataMap);
   }
@@ -155,6 +161,12 @@ public class TopologyActionOptions extends org.apache.thrift.TUnion<TopologyActi
     return x;
   }
 
+  public static TopologyActionOptions update_options(UpdateActionOptions value) {
+    TopologyActionOptions x = new TopologyActionOptions();
+    x.set_update_options(value);
+    return x;
+  }
+
 
   @Override
   protected void checkType(_Fields setField, Object value) throws ClassCastException {
@@ -169,6 +181,11 @@ public class TopologyActionOptions extends org.apache.thrift.TUnion<TopologyActi
           break;
         }
         throw new ClassCastException("Was expecting value of type RebalanceOptions for field 'rebalance_options', but got " + value.getClass().getSimpleName());
+      case UPDATE_OPTIONS:
+        if (value instanceof UpdateActionOptions) {
+          break;
+        }
+        throw new ClassCastException("Was expecting value of type UpdateActionOptions for field 'update_options', but got " + value.getClass().getSimpleName());
       default:
         throw new IllegalArgumentException("Unknown field id " + setField);
     }
@@ -199,6 +216,16 @@ public class TopologyActionOptions extends org.apache.thrift.TUnion<TopologyActi
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, field.type);
             return null;
           }
+        case UPDATE_OPTIONS:
+          if (field.type == UPDATE_OPTIONS_FIELD_DESC.type) {
+            UpdateActionOptions update_options;
+            update_options = new UpdateActionOptions();
+            update_options.read(iprot);
+            return update_options;
+          } else {
+            org.apache.thrift.protocol.TProtocolUtil.skip(iprot, field.type);
+            return null;
+          }
         default:
           throw new IllegalStateException("setField wasn't null, but didn't match any of the case statements!");
       }
@@ -218,6 +245,10 @@ public class TopologyActionOptions extends org.apache.thrift.TUnion<TopologyActi
       case REBALANCE_OPTIONS:
         RebalanceOptions rebalance_options = (RebalanceOptions)value_;
         rebalance_options.write(oprot);
+        return;
+      case UPDATE_OPTIONS:
+        UpdateActionOptions update_options = (UpdateActionOptions)value_;
+        update_options.write(oprot);
         return;
       default:
         throw new IllegalStateException("Cannot write union with unknown field " + setField_);
@@ -239,6 +270,11 @@ public class TopologyActionOptions extends org.apache.thrift.TUnion<TopologyActi
           rebalance_options = new RebalanceOptions();
           rebalance_options.read(iprot);
           return rebalance_options;
+        case UPDATE_OPTIONS:
+          UpdateActionOptions update_options;
+          update_options = new UpdateActionOptions();
+          update_options.read(iprot);
+          return update_options;
         default:
           throw new IllegalStateException("setField wasn't null, but didn't match any of the case statements!");
       }
@@ -258,6 +294,10 @@ public class TopologyActionOptions extends org.apache.thrift.TUnion<TopologyActi
         RebalanceOptions rebalance_options = (RebalanceOptions)value_;
         rebalance_options.write(oprot);
         return;
+      case UPDATE_OPTIONS:
+        UpdateActionOptions update_options = (UpdateActionOptions)value_;
+        update_options.write(oprot);
+        return;
       default:
         throw new IllegalStateException("Cannot write union with unknown field " + setField_);
     }
@@ -270,6 +310,8 @@ public class TopologyActionOptions extends org.apache.thrift.TUnion<TopologyActi
         return KILL_OPTIONS_FIELD_DESC;
       case REBALANCE_OPTIONS:
         return REBALANCE_OPTIONS_FIELD_DESC;
+      case UPDATE_OPTIONS:
+        return UPDATE_OPTIONS_FIELD_DESC;
       default:
         throw new IllegalArgumentException("Unknown field id " + setField);
     }
@@ -318,6 +360,20 @@ public class TopologyActionOptions extends org.apache.thrift.TUnion<TopologyActi
     value_ = value;
   }
 
+  public UpdateActionOptions get_update_options() {
+    if (getSetField() == _Fields.UPDATE_OPTIONS) {
+      return (UpdateActionOptions)getFieldValue();
+    } else {
+      throw new RuntimeException("Cannot get field 'update_options' because union is currently set to " + getFieldDesc(getSetField()).name);
+    }
+  }
+
+  public void set_update_options(UpdateActionOptions value) {
+    if (value == null) throw new NullPointerException();
+    setField_ = _Fields.UPDATE_OPTIONS;
+    value_ = value;
+  }
+
   public boolean is_set_kill_options() {
     return setField_ == _Fields.KILL_OPTIONS;
   }
@@ -325,6 +381,11 @@ public class TopologyActionOptions extends org.apache.thrift.TUnion<TopologyActi
 
   public boolean is_set_rebalance_options() {
     return setField_ == _Fields.REBALANCE_OPTIONS;
+  }
+
+
+  public boolean is_set_update_options() {
+    return setField_ == _Fields.UPDATE_OPTIONS;
   }
 
 

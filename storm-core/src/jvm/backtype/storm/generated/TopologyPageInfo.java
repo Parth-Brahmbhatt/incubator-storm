@@ -76,6 +76,7 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
   private static final org.apache.thrift.protocol.TField ASSIGNED_MEMONHEAP_FIELD_DESC = new org.apache.thrift.protocol.TField("assigned_memonheap", org.apache.thrift.protocol.TType.DOUBLE, (short)524);
   private static final org.apache.thrift.protocol.TField ASSIGNED_MEMOFFHEAP_FIELD_DESC = new org.apache.thrift.protocol.TField("assigned_memoffheap", org.apache.thrift.protocol.TType.DOUBLE, (short)525);
   private static final org.apache.thrift.protocol.TField ASSIGNED_CPU_FIELD_DESC = new org.apache.thrift.protocol.TField("assigned_cpu", org.apache.thrift.protocol.TType.DOUBLE, (short)526);
+  private static final org.apache.thrift.protocol.TField VERSION_FIELD_DESC = new org.apache.thrift.protocol.TField("version", org.apache.thrift.protocol.TType.I32, (short)527);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
@@ -104,6 +105,7 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
   private double assigned_memonheap; // optional
   private double assigned_memoffheap; // optional
   private double assigned_cpu; // optional
+  private int version; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -127,7 +129,8 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
     REQUESTED_CPU((short)523, "requested_cpu"),
     ASSIGNED_MEMONHEAP((short)524, "assigned_memonheap"),
     ASSIGNED_MEMOFFHEAP((short)525, "assigned_memoffheap"),
-    ASSIGNED_CPU((short)526, "assigned_cpu");
+    ASSIGNED_CPU((short)526, "assigned_cpu"),
+    VERSION((short)527, "version");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -184,6 +187,8 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
           return ASSIGNED_MEMOFFHEAP;
         case 526: // ASSIGNED_CPU
           return ASSIGNED_CPU;
+        case 527: // VERSION
+          return VERSION;
         default:
           return null;
       }
@@ -235,8 +240,9 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
   private static final int __ASSIGNED_MEMONHEAP_ISSET_ID = 8;
   private static final int __ASSIGNED_MEMOFFHEAP_ISSET_ID = 9;
   private static final int __ASSIGNED_CPU_ISSET_ID = 10;
+  private static final int __VERSION_ISSET_ID = 11;
   private short __isset_bitfield = 0;
-  private static final _Fields optionals[] = {_Fields.NAME,_Fields.UPTIME_SECS,_Fields.STATUS,_Fields.NUM_TASKS,_Fields.NUM_WORKERS,_Fields.NUM_EXECUTORS,_Fields.TOPOLOGY_CONF,_Fields.ID_TO_SPOUT_AGG_STATS,_Fields.ID_TO_BOLT_AGG_STATS,_Fields.SCHED_STATUS,_Fields.TOPOLOGY_STATS,_Fields.OWNER,_Fields.DEBUG_OPTIONS,_Fields.REPLICATION_COUNT,_Fields.REQUESTED_MEMONHEAP,_Fields.REQUESTED_MEMOFFHEAP,_Fields.REQUESTED_CPU,_Fields.ASSIGNED_MEMONHEAP,_Fields.ASSIGNED_MEMOFFHEAP,_Fields.ASSIGNED_CPU};
+  private static final _Fields optionals[] = {_Fields.NAME,_Fields.UPTIME_SECS,_Fields.STATUS,_Fields.NUM_TASKS,_Fields.NUM_WORKERS,_Fields.NUM_EXECUTORS,_Fields.TOPOLOGY_CONF,_Fields.ID_TO_SPOUT_AGG_STATS,_Fields.ID_TO_BOLT_AGG_STATS,_Fields.SCHED_STATUS,_Fields.TOPOLOGY_STATS,_Fields.OWNER,_Fields.DEBUG_OPTIONS,_Fields.REPLICATION_COUNT,_Fields.REQUESTED_MEMONHEAP,_Fields.REQUESTED_MEMOFFHEAP,_Fields.REQUESTED_CPU,_Fields.ASSIGNED_MEMONHEAP,_Fields.ASSIGNED_MEMOFFHEAP,_Fields.ASSIGNED_CPU,_Fields.VERSION};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
@@ -286,11 +292,15 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.DOUBLE)));
     tmpMap.put(_Fields.ASSIGNED_CPU, new org.apache.thrift.meta_data.FieldMetaData("assigned_cpu", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.DOUBLE)));
+    tmpMap.put(_Fields.VERSION, new org.apache.thrift.meta_data.FieldMetaData("version", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(TopologyPageInfo.class, metaDataMap);
   }
 
   public TopologyPageInfo() {
+    this.version = 0;
+
   }
 
   public TopologyPageInfo(
@@ -370,6 +380,7 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
     this.assigned_memonheap = other.assigned_memonheap;
     this.assigned_memoffheap = other.assigned_memoffheap;
     this.assigned_cpu = other.assigned_cpu;
+    this.version = other.version;
   }
 
   public TopologyPageInfo deepCopy() {
@@ -410,6 +421,8 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
     this.assigned_memoffheap = 0.0;
     set_assigned_cpu_isSet(false);
     this.assigned_cpu = 0.0;
+    this.version = 0;
+
   }
 
   public String get_id() {
@@ -906,6 +919,28 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
     __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __ASSIGNED_CPU_ISSET_ID, value);
   }
 
+  public int get_version() {
+    return this.version;
+  }
+
+  public void set_version(int version) {
+    this.version = version;
+    set_version_isSet(true);
+  }
+
+  public void unset_version() {
+    __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __VERSION_ISSET_ID);
+  }
+
+  /** Returns true if field version is set (has been assigned a value) and false otherwise */
+  public boolean is_set_version() {
+    return EncodingUtils.testBit(__isset_bitfield, __VERSION_ISSET_ID);
+  }
+
+  public void set_version_isSet(boolean value) {
+    __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __VERSION_ISSET_ID, value);
+  }
+
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
     case ID:
@@ -1076,6 +1111,14 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
       }
       break;
 
+    case VERSION:
+      if (value == null) {
+        unset_version();
+      } else {
+        set_version((Integer)value);
+      }
+      break;
+
     }
   }
 
@@ -1144,6 +1187,9 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
     case ASSIGNED_CPU:
       return get_assigned_cpu();
 
+    case VERSION:
+      return get_version();
+
     }
     throw new IllegalStateException();
   }
@@ -1197,6 +1243,8 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
       return is_set_assigned_memoffheap();
     case ASSIGNED_CPU:
       return is_set_assigned_cpu();
+    case VERSION:
+      return is_set_version();
     }
     throw new IllegalStateException();
   }
@@ -1403,6 +1451,15 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
         return false;
     }
 
+    boolean this_present_version = true && this.is_set_version();
+    boolean that_present_version = true && that.is_set_version();
+    if (this_present_version || that_present_version) {
+      if (!(this_present_version && that_present_version))
+        return false;
+      if (this.version != that.version)
+        return false;
+    }
+
     return true;
   }
 
@@ -1514,6 +1571,11 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
     list.add(present_assigned_cpu);
     if (present_assigned_cpu)
       list.add(assigned_cpu);
+
+    boolean present_version = true && (is_set_version());
+    list.add(present_version);
+    if (present_version)
+      list.add(version);
 
     return list.hashCode();
   }
@@ -1736,6 +1798,16 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
         return lastComparison;
       }
     }
+    lastComparison = Boolean.valueOf(is_set_version()).compareTo(other.is_set_version());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (is_set_version()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.version, other.version);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
     return 0;
   }
 
@@ -1917,6 +1989,12 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
       if (!first) sb.append(", ");
       sb.append("assigned_cpu:");
       sb.append(this.assigned_cpu);
+      first = false;
+    }
+    if (is_set_version()) {
+      if (!first) sb.append(", ");
+      sb.append("version:");
+      sb.append(this.version);
       first = false;
     }
     sb.append(")");
@@ -2170,6 +2248,14 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
+          case 527: // VERSION
+            if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
+              struct.version = iprot.readI32();
+              struct.set_version_isSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
           default:
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
         }
@@ -2322,6 +2408,11 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
         oprot.writeDouble(struct.assigned_cpu);
         oprot.writeFieldEnd();
       }
+      if (struct.is_set_version()) {
+        oprot.writeFieldBegin(VERSION_FIELD_DESC);
+        oprot.writeI32(struct.version);
+        oprot.writeFieldEnd();
+      }
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
@@ -2401,7 +2492,10 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
       if (struct.is_set_assigned_cpu()) {
         optionals.set(19);
       }
-      oprot.writeBitSet(optionals, 20);
+      if (struct.is_set_version()) {
+        optionals.set(20);
+      }
+      oprot.writeBitSet(optionals, 21);
       if (struct.is_set_name()) {
         oprot.writeString(struct.name);
       }
@@ -2476,6 +2570,9 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
       if (struct.is_set_assigned_cpu()) {
         oprot.writeDouble(struct.assigned_cpu);
       }
+      if (struct.is_set_version()) {
+        oprot.writeI32(struct.version);
+      }
     }
 
     @Override
@@ -2483,7 +2580,7 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
       TTupleProtocol iprot = (TTupleProtocol) prot;
       struct.id = iprot.readString();
       struct.set_id_isSet(true);
-      BitSet incoming = iprot.readBitSet(20);
+      BitSet incoming = iprot.readBitSet(21);
       if (incoming.get(0)) {
         struct.name = iprot.readString();
         struct.set_name_isSet(true);
@@ -2589,6 +2686,10 @@ public class TopologyPageInfo implements org.apache.thrift.TBase<TopologyPageInf
       if (incoming.get(19)) {
         struct.assigned_cpu = iprot.readDouble();
         struct.set_assigned_cpu_isSet(true);
+      }
+      if (incoming.get(20)) {
+        struct.version = iprot.readI32();
+        struct.set_version_isSet(true);
       }
     }
   }
