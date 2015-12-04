@@ -59,6 +59,10 @@
   [this name]
   (.killTopology (:nimbus (. this state)) name))
 
+(defn -updateTopology
+  [this name updateOptions]
+  (.updateTopology (:nimbus (. this state)) name updateOptions))
+
 (defn -getTopologyConf
   [this id]
   (.getTopologyConf (:nimbus (. this state)) id))

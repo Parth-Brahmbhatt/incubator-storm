@@ -229,6 +229,19 @@ def jar(jarfile, klass, *args):
         daemon=False,
         jvmopts=JAR_JVM_OPTS + ["-Dstorm.jar=" + jarfile])
 
+def update(*args):
+    """Syntax: [storm update topology-name [-j topology-jar] [-c config-file-path]]
+    Updates the topology with topology-name
+    """
+    if not args:
+        print_usage(command="update")
+        sys.exit(2)
+    exec_storm_class(
+        "backtype.storm.command.update_topology",
+        args=args,
+        jvmtype="-client",
+        extrajars=[USER_CONF_DIR, STORM_BIN_DIR])
+
 def kill(*args):
     """Syntax: [storm kill topology-name [-w wait-time-secs]]
 
@@ -660,7 +673,7 @@ COMMANDS = {"jar": jar, "kill": kill, "shell": shell, "nimbus": nimbus, "ui": ui
             "list": listtopos, "dev-zookeeper": dev_zookeeper, "version": version, "monitor": monitor,
             "upload-credentials": upload_credentials, "pacemaker": pacemaker, "heartbeats": heartbeats,
             "get-errors": get_errors, "set_log_level": set_log_level, "kill_workers": kill_workers,
-            "node-health-check": healthcheck}
+            "node-health-check": healthcheck, "update": update}
 
 def parse_config(config_list):
     global CONFIG_OPTS

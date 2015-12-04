@@ -75,6 +75,19 @@ public class WordCountTopology {
     }
   }
 
+  public static class PrintWordCount extends BaseBasicBolt {
+
+      @Override
+      public void execute(Tuple input, BasicOutputCollector collector) {
+          System.out.println(input.getString(0) + " = " + input.getInteger(1));
+      }
+
+      @Override
+      public void declareOutputFields(OutputFieldsDeclarer declarer) {
+
+      }
+  }
+
   public static void main(String[] args) throws Exception {
 
     TopologyBuilder builder = new TopologyBuilder();
@@ -83,13 +96,15 @@ public class WordCountTopology {
 
     builder.setBolt("split", new SplitSentence(), 8).shuffleGrouping("spout");
     builder.setBolt("count", new WordCount(), 12).fieldsGrouping("split", new Fields("word"));
+    builder.setBolt("count", new PrintWordCount(), 12).fieldsGrouping("split", new Fields("word"));
+
 
     Config conf = new Config();
     conf.setDebug(true);
 
 
     if (args != null && args.length > 0) {
-      conf.setNumWorkers(3);
+      conf.setNumWorkers(1);
 
       StormSubmitter.submitTopologyWithProgressBar(args[0], conf, builder.createTopology());
     }

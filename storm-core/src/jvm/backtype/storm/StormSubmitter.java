@@ -252,6 +252,77 @@ public class StormSubmitter {
         }
     }
 
+
+    /**
+     *
+     * @param name
+     * @param updateConf
+     * @param topology
+     * @param progressListener
+     * @param asUser The user as which this topology should be updated.
+     * @throws AlreadyAliveException
+     * @throws InvalidTopologyException
+     * @throws AuthorizationException
+     * @throws IllegalArgumentException thrown if configs will yield an unschedulable topology. validateConfs validates confs
+     */
+    public static void updateTopologyAs(String name, Map updateConf, StormTopology topology, ProgressListener progressListener, String asUser)
+            throws AlreadyAliveException, InvalidTopologyException, AuthorizationException, IllegalArgumentException {
+        if (updateConf != null && !Utils.isValidConf(updateConf)) {
+            throw new IllegalArgumentException("Storm conf is not valid. Must be json-serializable");
+        }
+
+        Map cmdLineConfOptions = Utils.readCommandLineOpts();
+        if (cmdLineConfOptions != null && !cmdLineConfOptions.isEmpty()) {
+            updateConf = updateConf == null ? new HashMap() : updateConf;
+            updateConf.putAll(cmdLineConfOptions);
+        }
+
+        Map conf = Utils.readStormConfig();
+        conf.putAll(updateConf);
+        conf.putAll(prepareZookeeperAuthentication(conf));
+
+        validateConfs(conf, topology);
+
+        UpdateOptions updateOptions = new UpdateOptions();
+        if (updateConf != null)
+            updateOptions.set_jsonConf(JSONValue.toJSONString(updateConf));
+        if (topology != null)
+            updateOptions.set_topology(topology);
+
+
+        try {
+            if (localNimbus != null) {
+                LOG.info("Updating topology " + name + " in local mode");
+                localNimbus.updateTopology(name, updateOptions);
+            } else {
+                String serConf = JSONValue.toJSONString(conf);
+                NimbusClient client = NimbusClient.getConfiguredClientAs(conf, asUser);
+                if (!topologyNameExists(conf, name, asUser)) {
+                    throw new RuntimeException("Topology with name `" + name + "` does not exist on cluster");
+                }
+                if(System.getProperties().containsKey("storm.jar")) {
+                    String jar = submitJarAs(conf, System.getProperty("storm.jar"), progressListener, asUser);
+                    updateOptions.set_uploadedJarLocation(jar);
+                }
+                try {
+                    LOG.info("Updating topology " + name + " in distributed mode with conf " + serConf);
+                    client.getClient().updateTopology(name, updateOptions);
+                } catch (InvalidTopologyException e) {
+                    LOG.warn("Update Topology exception: " + e.get_msg());
+                    throw e;
+                } catch (NotAliveException e) {
+                    LOG.warn("Topology not alive exception", e);
+                    throw e;
+                } finally {
+                    client.close();
+                }
+            }
+            LOG.info("Finished submitting topology: " + name);
+        } catch (TException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     /**
      * Submits a topology to run on the cluster. A topology runs forever or until
      * explicitly killed.
