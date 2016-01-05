@@ -710,7 +710,14 @@
                      (str "-Dstorm.options=" storm-options)
                      (str "-Dstorm.log.dir=" storm-log-dir)
                      (str "-Dlogging.sensitivity=" logging-sensitivity)
-                     (str "-Dlog4j.configurationFile=" storm-logback-conf-dir file-path-separator "worker.xml")
+;                    file scheme URI syntax: https://tools.ietf.org/html/draft-ietf-appsawg-file-scheme-03#section-2
+;                    checking only for 'file:' as the existing code and convention assumes a format starting with 'file:'
+                     (str "-Dlog4j.configurationFile="
+                       (if (.startsWith storm-logback-conf-dir "file:")
+                         storm-logback-conf-dir
+                         (let [file-uri-schema (if (.startsWith (System/getProperty "os.name") "Windows") "file:///" "file://")]
+                           (str file-uri-schema storm-logback-conf-dir)))
+                       file-path-separator "worker.xml")
                      (str "-DLog4jContextSelector=org.apache.logging.log4j.core.selector.BasicContextSelector")
                      (str "-Dstorm.id=" storm-id)
                      (str "-Dworker.id=" worker-id)
