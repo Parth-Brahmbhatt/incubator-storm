@@ -581,14 +581,17 @@
       (locking download-lock
         (log-message "Downloading code for storm id " storm-id " from " master-code-dir)
         (FileUtils/forceMkdir (File. tmproot))
-        (Utils/downloadFromMaster conf master-meta-file-path supervisor-meta-file-path)
-        (if (:code-distributor supervisor)
-          (.download (:code-distributor supervisor) storm-id (File. supervisor-meta-file-path)))
-        (extract-dir-from-jar (supervisor-stormjar-path tmproot) RESOURCES-SUBDIR tmproot)
-        (if (.exists (File. stormroot)) (FileUtils/forceDelete (File. stormroot)))
-        (FileUtils/moveDirectory (File. tmproot) (File. stormroot))
-        (setup-storm-code-dir conf (read-supervisor-storm-conf conf storm-id) stormroot)
-        (log-message "Finished downloading code for storm id " storm-id " from " master-code-dir))))
+        (try-cause
+          (Utils/downloadFromMaster conf master-meta-file-path supervisor-meta-file-path)
+          (if (:code-distributor supervisor)
+            (.download (:code-distributor supervisor) storm-id (File. supervisor-meta-file-path)))
+          (extract-dir-from-jar (supervisor-stormjar-path tmproot) RESOURCES-SUBDIR tmproot)
+          (if (.exists (File. stormroot)) (FileUtils/forceDelete (File. stormroot)))
+          (FileUtils/moveDirectory (File. tmproot) (File. stormroot))
+          (setup-storm-code-dir conf (read-supervisor-storm-conf conf storm-id) stormroot)
+          (log-message "Finished downloading code for storm id " storm-id " from " master-code-dir)
+          (catch Exception e
+            (log-warn-error e "There was a problem downloading storm code from nimbus."))))))
 
 (defn write-log-metadata-to-yaml-file! [storm-id port data conf]
   (let [file (get-log-metadata-file storm-id port)]
