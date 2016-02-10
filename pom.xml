@@ -217,8 +217,8 @@
         <zookeeper.version>3.4.6</zookeeper.version>
 	      <junit.version>4.11</junit.version>
         <hbase.version>0.96.1.1-hadoop2</hbase.version>
-        <hive.version>0.14.0.2.2.0.0-1010</hive.version>
-        <hadoop.version>2.6.0.2.2.0.0-1010</hadoop.version>
+        <hive.version>0.14.0</hive.version>
+        <hadoop.version>2.6.0</hadoop.version>
         <kafka.version>0.8.1.1</kafka.version>
     </properties>
 
@@ -614,7 +614,7 @@
         </repository>
         <repository>
        		<id>hortonworks.repo</id>
-       		<url>http://54.235.92.15/nexus/content/groups/public/</url>
+       		<url>http://repo.hortonworks.com/content/repositories/releases/</url>
        		<name>Hortonworks Repo</name>
        		<releases>
           		<enabled>true</enabled>
