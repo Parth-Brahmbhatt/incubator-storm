@@ -1332,7 +1332,6 @@
 
       (^ByteBuffer downloadChunk [this ^String id]
         (check-authorization! nimbus nil nil "fileDownload")
-        (sleep-secs 1)
         (let [downloaders (:downloaders nimbus)
               ^BufferFileInputStream is (.get downloaders id)]
           (when-not is

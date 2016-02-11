@@ -81,10 +81,10 @@ public abstract class SaslTransportPlugin implements ITransportPlugin {
             server_args.transportFactory(serverTransportFactory);
         }
 
-        //if (queueSize != null) {
-        //    server_args.executorService(new ThreadPoolExecutor(numWorkerThreads, numWorkerThreads, 
-        //                           60, TimeUnit.SECONDS, new ArrayBlockingQueue(queueSize)));
-        //}
+        if (queueSize != null) {
+            server_args.executorService(new ThreadPoolExecutor(numWorkerThreads, numWorkerThreads,
+                                   60, TimeUnit.SECONDS, new ArrayBlockingQueue(queueSize)));
+        }
 
         return new TThreadPoolServer(server_args);
     }

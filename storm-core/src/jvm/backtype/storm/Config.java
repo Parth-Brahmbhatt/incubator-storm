@@ -379,6 +379,14 @@ public class Config extends HashMap<String, Object> {
     public static final Object NIMBUS_THRIFT_MAX_BUFFER_SIZE_SCHEMA = ConfigValidation.IntegerValidator;
 
     /**
+     * Nimbus thrift server queue size, default is 100000. This is the request queue size , when there are more requests
+     * than number of threads to serve the requests, those requests will be queued to this queue. If the request queue
+     * size > this config, then the incoming requests will be rejected.
+     */
+    public static final String NIMBUS_QUEUE_SIZE = "nimbus.queue.size";
+    public static final Object NIMBUS_QUEUE_SIZE_SCHEMA = ConfigValidation.IntegerValidator;
+
+    /**
      * This parameter is used by the storm-deploy project to configure the
      * jvm options for the nimbus daemon.
      */
