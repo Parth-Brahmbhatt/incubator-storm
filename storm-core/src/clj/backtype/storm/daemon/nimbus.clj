@@ -265,8 +265,8 @@
   (log-message "Delaying event " event " for " delay-secs " secs for " storm-id)
   (schedule (:timer nimbus)
             delay-secs
-            #(transition! nimbus storm-id event false)
-            ))
+            #(try (transition! nimbus storm-id event false)
+               (catch Exception e (log-error e "Exception while trying transition")))))
 
 ;; active -> reassign in X secs
 
@@ -1492,7 +1492,6 @@
         missing-topologies (set/difference active-topologies code-ids)]
     (if (not (empty? missing-topologies))
       (do
-        (.removeFromLeaderLockQueue (:leader-elector nimbus))
         (doseq [missing missing-topologies]
           (log-message "missing topology " missing " has state on zookeeper but doesn't have a local dir on this host.")
           ;; complete heck to get around zookeeper eventual consistency issue. zk/sync is not helping us so adding a sleep.
